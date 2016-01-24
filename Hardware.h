@@ -126,7 +126,7 @@ protected:
 #ifdef PTGREY
 	void	QSSysConvertToOpenCV(Mat* openCV_image, Image PGR_image);
 #endif
-	void	QSSysPrintResult(bool pass);
+	void	QSSysPrintResult(int pass);
 public:
 	static  ImagingResources IR;
 	RECT	ImageRect[MAX_CAMERA];

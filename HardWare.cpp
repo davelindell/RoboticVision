@@ -2,10 +2,13 @@
 #include "time.h"
 #include "math.h"
 #include "Hardware.h"
+#include "Mnm.h"
 
+#define MEH 2
 #define GOOD 1
 #define BAD 0
 #define UGLY -1
+
 
 ImagingResources	CTCSys::IR;
 
@@ -54,8 +57,12 @@ long QSProcessThreadFunc(CTCSys *QS)
 	char im_path[100];
 #endif
 
+	//namedWindow("Lindell", WINDOW_AUTOSIZE);
+	Mnm mnm = Mnm();
+	
+
 	int		i;
-	bool	pass = GOOD;
+	int	pass = GOOD;
 	while (QS->EventEndProcess == FALSE) {
 
 #ifdef PTGREY
@@ -98,7 +105,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 
 			for(i=0; i < QS->IR.NumCameras; i++) {
 				// Example using Canny.  Input is ProcBuf.  Output is OutBuf1
-				cvtColor(QS->IR.ProcBuf[i], QS->IR.OutBuf1[i], CV_RGB2GRAY);
+				//cvtColor(QS->IR.ProcBuf[i], QS->IR.OutBuf1[i], CV_RGB2GRAY);
 				// Canny(QS->IR.OutBuf1[i], QS->IR.OutBuf1[i], 70, 100);
 				QS->IR.ProcBuf[i].copyTo(QS->IR.OutBuf1[i]);
 
@@ -111,17 +118,216 @@ long QSProcessThreadFunc(CTCSys *QS)
 				if (!QS->IR.Inspection) {
 					// Example of displaying color buffer ProcBuf
 					QS->IR.ProcBuf[i].copyTo(QS->IR.DispBuf[i]);
-				} else {
-					
-					//	Some template code
-					// Example of displaying B/W buffer OutBuf1
-					// QS->IR.OutBuf[0] = QS->IR.OutBuf[1] = QS->IR.OutBuf[2] = QS->IR.OutROI1[i];
-					// merge(QS->IR.OutBuf, 3, QS->IR.DispROI[i]);
-					// Example to show inspection result, print result after the image is copied
-
+				} else {					
 					// TODO: Insert processing code here
 
+					// make some copies
+					QS->IR.OutBuf1[i].copyTo(QS->IR.OutROI1[i]);
 
+					// isolate the conveyer belt
+					Rect leftROI(0, 0, 130, 480);
+					Rect rightROI(510, 0, 130, 480);
+					Mat mask = QS->IR.OutBuf1[i](leftROI);
+					mask.setTo(0);
+					mask = QS->IR.OutBuf1[i](rightROI);
+					mask.setTo(0);
+
+					// blur the image
+					GaussianBlur(QS->IR.OutBuf1[i], QS->IR.OutBuf1[i], Size(15, 15), 11, 0);
+
+					//QS->IR.OutROI1[i].setTo(Scalar(0, 0, 255));
+
+					// convert to HSV colorspace
+					cvtColor(QS->IR.OutBuf1[i], QS->IR.OutBuf1[i], CV_RGB2HSV);
+					cvtColor(QS->IR.OutROI1[i], QS->IR.OutROI1[i], CV_RGB2HSV);
+
+					// threshold intense colors
+					inRange(QS->IR.OutBuf1[i], Scalar(0, 60, 60), Scalar(255, 255, 255), QS->IR.OutBuf1[i]);
+					
+					// separate HSV channels
+					vector<Mat> hsv_planes;
+					split(QS->IR.OutROI1[i], hsv_planes);
+
+					// Find avg hue of remaining area
+					Scalar mean_value = mean(hsv_planes[0], QS->IR.OutBuf1[i]);
+					float avg_hue = mean_value.val[0];
+
+					Scalar mean_mat, std_mat;
+					meanStdDev(hsv_planes[0], mean_mat, std_mat, QS->IR.OutBuf1[i]);
+					float std_dev = std_mat.val[0];
+
+					//bitwise_not(QS->IR.OutBuf1[i], QS->IR.OutBuf1[i]);
+
+					// get color and write on image
+					Mnm::Color color = Mnm::getColor(avg_hue);
+					char text[32];
+					if (color == Mnm::blue) {
+						sprintf(text, "blue");
+						pass = GOOD;
+					}
+					else if (color == Mnm::red) {
+						sprintf(text, "red");
+						pass = BAD;
+					}
+					else if (color == Mnm::green) {
+						sprintf(text, "green");
+						pass = BAD;
+					}
+					else if (color == Mnm::yellow) {
+						sprintf(text, "yellow");
+						pass = BAD;
+					}
+					else {
+						sprintf(text, "unrecognized");
+						pass = MEH;
+					}
+
+					// then our color has a lot of variation, check if broken
+					if (std_dev > 20) {
+						QS->IR.OutBuf1[i].copyTo(QS->IR.OutROI1[i]);
+						bitwise_not(QS->IR.OutROI1[i], QS->IR.OutROI1[i]);
+
+						SimpleBlobDetector::Params params;
+
+						// Change thresholds
+						params.minThreshold = 0;
+						params.maxThreshold = 255;
+
+						// Filter by Area.
+						params.filterByArea = true;
+						params.minArea = 1200;
+
+						// Filter by Circularity
+						params.filterByCircularity = true;
+						params.minCircularity = 0.5;
+
+						// Filter by Convexity
+						params.filterByConvexity = true;
+						params.minConvexity = .9;
+
+						// Filter by Inertia
+						params.filterByInertia = true;
+						params.minInertiaRatio = 0.5;
+						
+						Ptr<SimpleBlobDetector> d = SimpleBlobDetector::create(params);
+						vector<KeyPoint> keypoints;
+						d->detect(QS->IR.OutROI1[i], keypoints);
+
+						drawKeypoints(QS->IR.OutROI1[i], keypoints, QS->IR.OutROI1[i], Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+						//namedWindow("Contours", CV_WINDOW_AUTOSIZE);
+						//imshow("Contours", QS->IR.OutROI1[i]);
+						//waitKey(0);
+
+						//Canny(QS->IR.OutROI1[i], QS->IR.OutROI1[i], 0, 255, 3);
+
+						//vector<Vec3f> circles;
+
+						///// Apply the Hough Transform to find the circles
+						//HoughCircles(QS->IR.OutROI1[i], circles, CV_HOUGH_GRADIENT, 1, QS->IR.OutROI1[i].rows / 8, 255, 70, 0, 0);
+
+						//cvtColor(QS->IR.OutROI1[i], QS->IR.OutROI1[i], CV_GRAY2BGR);
+
+						///// Draw the circles detected
+						//for (size_t i = 0; i < circles.size(); i++)
+						//{
+						//	Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
+						//	int radius = cvRound(circles[i][2]);
+						//	// circle center
+						//	circle(QS->IR.OutROI1[i], center, 3, Scalar(0, 255, 0), -1, 8, 0);
+						//	// circle outline
+						//	circle(QS->IR.OutROI1[i], center, radius, Scalar(0, 0, 255), 3, 8, 0);
+						//}
+						///// Show your results
+						//namedWindow("Hough Circle Transform Demo", CV_WINDOW_AUTOSIZE);
+						//imshow("Hough Circle Transform Demo", QS->IR.OutROI1[i]);
+						//waitKey(0);
+
+						//vector<vector<Point> > contours;
+						//vector<Vec4i> hierarchy;
+						//RNG rng(12345);
+						////QS->IR.OutBuf1[i].copyTo(QS->IR.OutROI1[i]);
+						//findContours(QS->IR.OutROI1[i], contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+
+						//Mat drawing = Mat::zeros(QS->IR.OutROI1[i].size(), CV_8UC3);
+						//for (int k = 0; k < contours.size(); k++)
+						//{
+						//	Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
+						//	drawContours(drawing, contours, k, color, 2, 8, hierarchy, 0, Point());
+						//}
+
+						///// Get the moments
+						//vector<Moments> mu(contours.size());
+						//for (int k = 0; k < contours.size(); k++)
+						//{
+						//	mu[k] = moments(contours[k], false);
+						//}
+
+						/////  Get the mass centers:
+						//vector<Point2f> mc(contours.size());
+						//for (int k = 0; k < contours.size(); k++)
+						//{
+						//	mc[k] = Point2f(mu[k].m10 / mu[k].m00, mu[k].m01 / mu[k].m00);
+						//}
+
+						// Show in a window
+						//namedWindow("Contours", CV_WINDOW_AUTOSIZE);
+						//imshow("Contours", drawing);
+						//waitKey(0);
+						
+						//if(mc.size() > 1){
+						//		sprintf(text, "broken");
+						//		pass = UGLY;
+						//}
+
+						//vector<Point2f> corner_pts;
+						//double qualityLevel = 0.01;
+						//double minDistance = 10;
+						//bool useHarrisDetector = false;
+						//int maxCorners = 50;
+						//int blockSize = 2;
+						//double k = 0.04;
+						//Size winSize = Size(5, 5);
+						//Size zeroZone = Size(-1, -1);
+						//TermCriteria criteria = TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 40, 0.001);
+
+						///// Apply corner detection
+						//goodFeaturesToTrack(QS->IR.OutROI1[i],
+						//	corner_pts,
+						//	maxCorners,
+						//	qualityLevel,
+						//	minDistance,
+						//	Mat(),
+						//	blockSize,
+						//	useHarrisDetector,
+						//	k);
+
+						//cornerSubPix(QS->IR.OutROI1[i], corner_pts, winSize, zeroZone, criteria);
+						//cvtColor(QS->IR.OutROI1[i], QS->IR.OutROI1[i], CV_GRAY2RGB);
+
+						///// Drawing a circle around corners
+						//for (unsigned k = 0; k < corner_pts.size(); k++){
+						//	circle(QS->IR.OutROI1[i], Point(corner_pts.at(k).x, corner_pts.at(k).y), 5, Scalar(0, 0, 250), 2, 8, 0);
+						//}
+
+						//namedWindow("Contours", CV_WINDOW_AUTOSIZE);
+						//imshow("Contours", QS->IR.OutROI1[i]);
+						//waitKey(0);
+
+					}
+
+					// have output image show just M&M
+					QS->IR.OutBuf1[i].copyTo(mask);
+					bitwise_and(mask, hsv_planes[0], hsv_planes[0]);
+					bitwise_and(mask, hsv_planes[1], hsv_planes[1]);
+					bitwise_and(mask, hsv_planes[2], hsv_planes[2]);
+					merge(hsv_planes, QS->IR.OutBuf1[i]);
+					cvtColor(QS->IR.OutBuf1[i], QS->IR.OutBuf1[i], CV_HSV2RGB);
+					putText(QS->IR.OutBuf1[i], text, Point(400, 30), FONT_HERSHEY_SIMPLEX, 1, CV_RGB(0, 255, 0), 2);
+					sprintf(text, "%.3f", std_dev);
+					putText(QS->IR.OutBuf1[i], text, Point(30, 70), FONT_HERSHEY_SIMPLEX, 1, CV_RGB(0, 255, 0), 2);
+
+					// Copy output to display buffer
 					QS->IR.OutBuf1[i].copyTo(QS->IR.DispBuf[i]);
 					QS->QSSysPrintResult(pass);
 				}
@@ -308,10 +514,13 @@ void CTCSys::QSSysConvertToOpenCV(Mat* openCV_image, Image PGR_image)
 }
 #endif
 
-void CTCSys::QSSysPrintResult(bool pass)
+void CTCSys::QSSysPrintResult(int pass)
 {
 	char text[32];
-	if (pass == 1){
+	if (pass == 2){
+		strcpy(text, "Meh");
+	}
+	else if (pass == 1){
 		strcpy(text, "Good");
 	}
 	else if (pass == 0) {
