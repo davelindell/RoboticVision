@@ -123,10 +123,13 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>C:\Program Files %28x86%29\opencv\prebuild\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\opencv\build\lib\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opencv_video300d.lib;opencv_videoio300d.lib;opencv_videostab300d.lib;opencv_calib3d300d.lib;opencv_core300d.lib;opencv_features2d300d.lib;opencv_flann300d.lib;opencv_hal300d.lib;opencv_highgui300d.lib;opencv_imgcodecs300d.lib;opencv_imgproc300d.lib;opencv_ml300d.lib;opencv_objdetect300d.lib;opencv_photo300d.lib;opencv_shape300d.lib;opencv_stitching300d.lib;opencv_superres300d.lib;opencv_ts300d.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>

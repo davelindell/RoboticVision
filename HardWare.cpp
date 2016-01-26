@@ -146,6 +146,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 					
 					// separate HSV channels
 					vector<Mat> hsv_planes;
+					//GaussianBlur(QS->IR.OutROI1[i], QS->IR.OutROI1[i], Size(15, 15), 11, 0);
 					split(QS->IR.OutROI1[i], hsv_planes);
 
 					// Find avg hue of remaining area
@@ -161,6 +162,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 					// get color and write on image
 					Mnm::Color color = Mnm::getColor(avg_hue);
 					char text[32];
+					int broken_flag = 0;
 					if (color == Mnm::blue) {
 						sprintf(text, "blue");
 						pass = GOOD;
@@ -178,43 +180,98 @@ long QSProcessThreadFunc(CTCSys *QS)
 						pass = BAD;
 					}
 					else {
-						sprintf(text, "unrecognized");
+						broken_flag = 1;
+					}
+
+					Mat nonZeroCoordinates;
+					findNonZero(QS->IR.OutBuf1[i], nonZeroCoordinates);
+
+					if (nonZeroCoordinates.total() == 0) {
+						sprintf(text, "nothing");
 						pass = MEH;
 					}
 
 					// then our color has a lot of variation, check if broken
-					if (std_dev > 20) {
-						QS->IR.OutBuf1[i].copyTo(QS->IR.OutROI1[i]);
-						bitwise_not(QS->IR.OutROI1[i], QS->IR.OutROI1[i]);
+					if (std_dev > 20 || broken_flag) {
+						// filtering by convexity defects
 
-						SimpleBlobDetector::Params params;
-
-						// Change thresholds
-						params.minThreshold = 0;
-						params.maxThreshold = 255;
-
-						// Filter by Area.
-						params.filterByArea = true;
-						params.minArea = 1200;
-
-						// Filter by Circularity
-						params.filterByCircularity = true;
-						params.minCircularity = 0.5;
-
-						// Filter by Convexity
-						params.filterByConvexity = true;
-						params.minConvexity = .9;
-
-						// Filter by Inertia
-						params.filterByInertia = true;
-						params.minInertiaRatio = 0.5;
+						vector<vector<Point> > contours;
 						
-						Ptr<SimpleBlobDetector> d = SimpleBlobDetector::create(params);
-						vector<KeyPoint> keypoints;
-						d->detect(QS->IR.OutROI1[i], keypoints);
+						vector<Vec4i> hierarchy;
+						RNG rng(12345);
+						QS->IR.OutBuf1[i].copyTo(QS->IR.OutROI1[i]);
+						findContours(QS->IR.OutROI1[i], contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
-						drawKeypoints(QS->IR.OutROI1[i], keypoints, QS->IR.OutROI1[i], Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+						vector<vector<Vec4i>> defects(contours.size());
+						vector<vector<int>> hull(contours.size());
 
+						//Mat drawing = Mat::zeros(QS->IR.OutROI1[i].size(), CV_8UC3);
+						//for (int k = 0; k < contours.size(); k++)
+						//{
+						//	Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
+						//	drawContours(drawing, contours, k, color, 2, 8, hierarchy, 0, Point());
+						//}
+
+						//namedWindow("Contours", CV_WINDOW_AUTOSIZE);
+						//imshow("Contours", drawing);
+						//waitKey(0);
+
+						for (int k = 0; k < contours.size(); k++) {
+							convexHull(Mat(contours[k]), hull[k], false);
+							if (contours[k].size() > 3) {
+								convexityDefects(contours[k], hull[k], defects[k]);
+							}
+						}
+						
+						for (int k = 0; k < defects.size(); k++) {
+							for (int j = 1; j < defects[k].size(); j++) {
+								if (defects[k][j][3] > 400) {
+									sprintf(text, "broken");
+									pass = UGLY;
+									break;
+								}
+							}
+						}
+
+
+						// Blob filtering
+						//QS->IR.OutBuf1[i].copyTo(QS->IR.OutROI1[i]);
+						//bitwise_not(QS->IR.OutROI1[i], QS->IR.OutROI1[i]);
+
+						//SimpleBlobDetector::Params params;
+
+						//// Change thresholds
+						//params.minThreshold = 0;
+						//params.maxThreshold = 255;
+
+						//// Filter by Area.
+						//params.filterByArea = true;
+						//params.minArea = 1200;
+
+						//// Filter by Circularity
+						//params.filterByCircularity = true;
+						//params.minCircularity = 0.5;
+
+						//// Filter by Convexity
+						//params.filterByConvexity = true;
+						//params.minConvexity = .9;
+
+						//// Filter by Inertia
+						//params.filterByInertia = true;
+						//params.minInertiaRatio = 0.5;
+						//
+						//Ptr<SimpleBlobDetector> d = SimpleBlobDetector::create(params);
+						//vector<KeyPoint> keypoints;
+						//d->detect(QS->IR.OutROI1[i], keypoints);
+
+						//drawKeypoints(QS->IR.OutROI1[i], keypoints, QS->IR.OutROI1[i], Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+						//if(keypoints.size() == 0){
+						//	sprintf(text, "broken");
+						//	pass = UGLY;
+						//}
+
+						// Circle detection
 						//namedWindow("Contours", CV_WINDOW_AUTOSIZE);
 						//imshow("Contours", QS->IR.OutROI1[i]);
 						//waitKey(0);
@@ -333,6 +390,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 				}
 			}
 			QS->QSSysDisplayImage();
+			//Sleep(1000);
 		}
 	} 
 	QS->EventEndProcess = FALSE;
