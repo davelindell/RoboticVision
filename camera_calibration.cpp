@@ -194,23 +194,26 @@ int task3() {
 int task4() {
 	// Read in points from provided data file
 	ifstream data("data_task4.txt");
-	stringstream ss;
+
 	char buff[100];
 
-	vector<Point2f> image_points(20);
-	vector<Point3f> object_points(20);
+	vector<Point2f> image_points(0);
+	vector<Point3f> object_points(0);
 	float x, y, z;
 
 	for (int i = 0; i < 20; i++){
 		data.getline(buff, 100);
+		stringstream ss;
 		ss << buff;
 		ss >> x;
 		ss << buff;
 		ss >> y;
 		image_points.push_back(Point2f(x, y));
+		memset(buff, 0, 100);
 	}
 	for (int i = 0; i < 20; i++){
 		data.getline(buff, 100);
+		stringstream ss;
 		ss << buff;
 		ss >> x;
 		ss << buff;
@@ -218,6 +221,7 @@ int task4() {
 		ss << buff;
 		ss >> z;
 		object_points.push_back(Point3f(x, y, z));
+		memset(buff, 0, 100);
 	}
 
 	// read yml file
@@ -239,7 +243,9 @@ int task4() {
 	Mat rvec, tvec;
 	solvePnP(object_points, image_points, camera_matrix, dist_coeffs, rvec, tvec);
 
-	rvec = rvec.diag(rvec);
+	Rodrigues(rvec, rvec);
+
+	//rvec = rvec.diag(rvec);
 
 	// write out rotation/translationa vectors
 	ofstream ofs;
@@ -398,7 +404,7 @@ int task6()  {
 }
 
 int main(int argc, char **argv) {
-	int task = 6;
+	int task = 4;
 
 	switch (task) {
 	case 1: task1();
