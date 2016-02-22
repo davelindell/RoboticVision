@@ -1,0 +1,13 @@
+SetCommand(_ESTOP, 1, 0)
+If GetValue(_DIN, 3) > 0 then
+	SetCommand(_HOME, 1)
+	SetCommand(_MMOD, 1, 2)
+	SetCommand(_G, 1, 0)
+End If
+If GetValue(_DIN, 4) > 0 then
+	SetCommand(_HOME, 2)
+	SetCommand(_MMOD, 1, 2)
+	SetCommand(_G, 1, 0)
+End If
+SetCommand(_MG, 1, 0)
+
