@@ -2,7 +2,8 @@
 #include "time.h"
 #include "math.h"
 #include "Hardware.h"
-#include<fstream>
+#include <fstream>
+#include <gsl/gsl_multifit.h>
 
 ImagingResources	CTCSys::IR;
 
@@ -277,12 +278,39 @@ long QSProcessThreadFunc(CTCSys *QS)
 
 			//// get 3d points
 			//Mat L_coord, R_coord;
+			vector<Point3f> dataPoints;
 			//perspectiveTransform(L_3d, L_coord, Q);
 			//perspectiveTransform(R_3d, R_coord, Q);
 
 			// store points until nth frame
 
 			// if nth frame, determine polynomial fit, calculate z
+			int degree = 3;
+			double chisq;
+			gsl_matrix *Z, *cov;
+			gsl_vector *x, *y, *cx, *cy;
+
+			Z = gsl_matrix_alloc(dataPoints.size(), degree);
+			x = gsl_vector_alloc(dataPoints.size());
+			y = gsl_vector_alloc(dataPoints.size());
+
+			cx = gsl_vector_alloc(degree);
+			cy = gsl_vector_alloc(degree);
+			cov = gsl_matrix_alloc(degree, degree);
+
+			for (int i = 0; i < dataPoints.size(); i++){
+				gsl_matrix_set(Z, i, 0, 1.0);
+				gsl_matrix_set(Z, i, 1, dataPoints[i].z);
+				gsl_matrix_set(Z, i, 2, dataPoints[i].z*dataPoints[i].z);
+
+				gsl_vector_set(x, i, dataPoints[i].x);
+				gsl_vector_set(y, i, dataPoints[i].y);
+			}
+
+			gsl_multifit_linear_workspace * work = gsl_multifit_linear_alloc(dataPoints.size(), degree);
+			gsl_multifit_linear(Z, x, cx, cov, &chisq, work);
+			gsl_multifit_linear(Z, y, cy, cov, &chisq, work);
+
 
 			// move catcher
 
