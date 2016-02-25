@@ -86,6 +86,42 @@ long QSProcessThreadFunc(CTCSys *QS)
     long	FrameStamp;
     
     FrameStamp = 0;
+
+	char path[100];
+	int im_i = 0;
+
+	Mat l_calib, r_calib;
+	bool calibrated = false;
+
+	// read calibration params
+	// read yml file
+	FileStorage L_fs("cal/l_camera.yml", FileStorage::READ);
+	FileStorage R_fs("cal/r_camera.yml", FileStorage::READ);
+	FileStorage fs("cal/rectify.yml", FileStorage::READ);
+
+	Mat L_camera_matrix, L_dist_coeffs;
+	Mat R_camera_matrix, R_dist_coeffs;
+	Mat R1, R2, P1, P2, Q;
+
+	L_fs["cameraMatrix"] >> L_camera_matrix;
+	L_fs["distCoeffs"] >> L_dist_coeffs;
+	R_fs["cameraMatrix"] >> R_camera_matrix;
+	R_fs["distCoeffs"] >> R_dist_coeffs;
+	fs["R1"] >> R1;
+	fs["R2"] >> R2;
+	fs["P1"] >> P1;
+	fs["P2"] >> P2;
+	fs["Q"] >> Q;
+
+	fs.release();
+	L_fs.release();
+	R_fs.release();
+
+	// Initialize the catcher.  QS->moveX and QS->moveY (both in inches) must be calculated and set first.
+	QS->Move_X = 0;					// replace 0 with your x coordinate
+	QS->Move_Y = 0;					// replace 0 with your y coordinate
+	SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
+
 	while (QS->EventEndProcess == FALSE) {
 #ifdef PTGREY		// Image Acquisition
 		if (QS->IR.Acquisition == TRUE) {
@@ -115,7 +151,15 @@ long QSProcessThreadFunc(CTCSys *QS)
 			}
 		}
 #else
-		Sleep (100);
+		// load in training images
+		sprintf(path, "im/Ball1L%02d", im_i);
+		Mat l_im = imread(path, CV_LOAD_IMAGE_GRAYSCALE);
+		sprintf(path, "im/Ball1R%02d", im_i);
+		Mat r_im = imread(path, CV_LOAD_IMAGE_GRAYSCALE);
+
+		l_im.copyTo(QS->IR.ProcBuf[0]);
+		r_im.copyTo(QS->IR.ProcBuf[1]);
+
 #endif
 		// Process Image ProcBuf
 		if (QS->IR.CatchBall) {  	// Click on "Catch" button to toggle the CatchBall flag when done catching
@@ -125,16 +169,52 @@ long QSProcessThreadFunc(CTCSys *QS)
 			for(i=0; i < QS->IR.NumCameras; i++) {
 #ifdef PTG_COLOR
 				cvtColor(QS->IR.ProcBuf[i][BufID], QS->IR.OutBuf1[i], CV_RGB2GRAY, 0);
-#else			// Example using Canny.  Input is ProcBuf.  Output is OutBuf1
-				Canny(QS->IR.ProcBuf[i], QS->IR.OutBuf1[i], 70, 100);
+#else			
+
 #endif
-				// remove the Canny function above and add your ball detection and trajectory estimation code here
-				// calculate your estimated ball x, y location in inches and assigned them to moveX, and moveY below
+				// use first image as calibration image
+				if (!calibrated) {
+					QS->IR.ProcBuf[0].copyTo(l_calib);
+					QS->IR.ProcBuf[1].copyTo(r_calib);
+				}
+
+				// identify ROI in L and R cameras
+
+
+				// use difference from l_calib/r_calib to find if ball is there
+
+				// get center points of ball
+
+				// undistort points
+
+				//undistortPoints(L_pts, L_ctd, L_camera_matrix, L_dist_coeffs, R1, P1);
+				//undistortPoints(R_pts, R_ctd, R_camera_matrix, R_dist_coeffs, R2, P2);
+
+				//vector<Point3f> L_3d, R_3d;
+				//for (int i = 0; i < 4; i++) {
+				//	L_3d.push_back(Point3f(L_ctd[i].x, L_ctd[i].y, L_ctd[i].x - R_ctd[i].x));
+				//	R_3d.push_back(Point3f(R_ctd[i].x, R_ctd[i].y, L_ctd[i].x - R_ctd[i].x));
+				//}
+
+
+				//// get 3d points
+				//Mat L_coord, R_coord;
+				//perspectiveTransform(L_3d, L_coord, Q);
+				//perspectiveTransform(R_3d, R_coord, Q);
+
+				// store points until nth frame
+
+				// if nth frame, determine polynomial fit, calculate z
+
+				// move catcher
+				
+
+				// update catcher if greater than nth points with new calculation
+
+
+
 			}
-			// This is how you move the catcher.  QS->moveX and QS->moveY (both in inches) must be calculated and set first.
-			QS->Move_X = 0;					// replace 0 with your x coordinate
-			QS->Move_Y = 0;					// replace 0 with your y coordinate
-			SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
+
 		}
 		// Display Image
 		if (QS->IR.UpdateImage) {
