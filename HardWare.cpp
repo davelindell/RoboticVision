@@ -2,6 +2,7 @@
 #include "time.h"
 #include "math.h"
 #include "Hardware.h"
+#include<fstream>
 
 ImagingResources	CTCSys::IR;
 
@@ -82,13 +83,18 @@ long QSProcessThreadFunc(CTCSys *QS)
 {
 	int     i;
 	int     BufID = 0;
+	int		xl = 290;
+	int		xr = 200;
+	int		y = 0;
+	int		width = 150;
+	int		height = 280;
 	char    str[32];
     long	FrameStamp;
     
     FrameStamp = 0;
 
 	char path[100];
-	int im_i = 0;
+	int im_i = 22;
 
 	Mat l_calib, r_calib;
 	bool calibrated = false;
@@ -152,9 +158,9 @@ long QSProcessThreadFunc(CTCSys *QS)
 		}
 #else
 		// load in training images
-		sprintf(path, "im/Ball1L%02d", im_i);
+		sprintf(path, "im/Ball2L%02d.bmp", im_i);
 		Mat l_im = imread(path, CV_LOAD_IMAGE_GRAYSCALE);
-		sprintf(path, "im/Ball1R%02d", im_i);
+		sprintf(path, "im/Ball2R%02d.bmp", im_i);
 		Mat r_im = imread(path, CV_LOAD_IMAGE_GRAYSCALE);
 
 		l_im.copyTo(QS->IR.ProcBuf[0]);
@@ -174,12 +180,12 @@ long QSProcessThreadFunc(CTCSys *QS)
 #endif
 				// use first image as calibration image
 				if (!calibrated) {
-					QS->IR.ProcBuf[0].copyTo(l_calib);
-					QS->IR.ProcBuf[1].copyTo(r_calib);
+					QS->IR.ProcBuf[0](Rect(xl, y, width, height)).copyTo(l_calib);
+					QS->IR.ProcBuf[1](Rect(xr, y, width, height)).copyTo(r_calib);
 				}
 
 				// identify ROI in L and R cameras
-
+				Mat child = QS->IR.ProcBuf[i](Rect(xl-90*i, y, width, height));
 
 				// use difference from l_calib/r_calib to find if ball is there
 
