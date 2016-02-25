@@ -6,6 +6,10 @@
 
 ImagingResources	CTCSys::IR;
 
+struct KeyPointCompare {
+	bool operator() (KeyPoint i, KeyPoint j) { return (i.size>j.size); }
+} keyPointCompare;
+
 CTCSys::CTCSys()
 {
 	EventEndProcess = TRUE;
@@ -81,6 +85,8 @@ long QSMoveThreadFunc(CTCSys *QS)
 
 long QSProcessThreadFunc(CTCSys *QS)
 {
+	namedWindow("debug", WINDOW_AUTOSIZE);
+
 	int     i;
 	int     BufID = 0;
 	int		xl = 290;
@@ -94,16 +100,18 @@ long QSProcessThreadFunc(CTCSys *QS)
     FrameStamp = 0;
 
 	char path[100];
-	int im_i = 22;
+	int im_i = 0;
 
-	Mat l_calib, r_calib;
+	Mat calib[2], roi[2], roi_diff[2];
+	;
 	bool calibrated = false;
+	bool detected_ball = false;
 
 	// read calibration params
 	// read yml file
-	FileStorage L_fs("cal/l_camera.yml", FileStorage::READ);
-	FileStorage R_fs("cal/r_camera.yml", FileStorage::READ);
-	FileStorage fs("cal/rectify.yml", FileStorage::READ);
+	FileStorage L_fs("cal\\l_camera.yml", FileStorage::READ);
+	FileStorage R_fs("cal\\r_camera.yml", FileStorage::READ);
+	FileStorage fs("cal\\rectify.yml", FileStorage::READ);
 
 	Mat L_camera_matrix, L_dist_coeffs;
 	Mat R_camera_matrix, R_dist_coeffs;
@@ -158,13 +166,19 @@ long QSProcessThreadFunc(CTCSys *QS)
 		}
 #else
 		// load in training images
-		sprintf(path, "im/Ball2L%02d.bmp", im_i);
+		sprintf(path, "im\\Ball3L%02d.bmp", im_i);
 		Mat l_im = imread(path, CV_LOAD_IMAGE_GRAYSCALE);
-		sprintf(path, "im/Ball2R%02d.bmp", im_i);
+		sprintf(path, "im\\Ball3R%02d.bmp", im_i);
 		Mat r_im = imread(path, CV_LOAD_IMAGE_GRAYSCALE);
+
+		if (!l_im.data || !r_im.data) {
+			printf("Error reading images\n");
+			return -1;
+		}
 
 		l_im.copyTo(QS->IR.ProcBuf[0]);
 		r_im.copyTo(QS->IR.ProcBuf[1]);
+
 
 #endif
 		// Process Image ProcBuf
@@ -180,46 +194,104 @@ long QSProcessThreadFunc(CTCSys *QS)
 #endif
 				// use first image as calibration image
 				if (!calibrated) {
-					QS->IR.ProcBuf[0](Rect(xl, y, width, height)).copyTo(l_calib);
-					QS->IR.ProcBuf[1](Rect(xr, y, width, height)).copyTo(r_calib);
+					QS->IR.ProcBuf[0](Rect(xl, y, width, height)).copyTo(calib[0]);
+					QS->IR.ProcBuf[1](Rect(xr, y, width, height)).copyTo(calib[1]);
+					calibrated = true;
 				}
 
 				// identify ROI in L and R cameras
-				Mat child = QS->IR.ProcBuf[i](Rect(xl-90*i, y, width, height));
+				roi[i] = QS->IR.ProcBuf[i](Rect(xl-90*i, y, width, height));
 
 				// use difference from l_calib/r_calib to find if ball is there
-
-				// get center points of ball
-
-				// undistort points
-
-				//undistortPoints(L_pts, L_ctd, L_camera_matrix, L_dist_coeffs, R1, P1);
-				//undistortPoints(R_pts, R_ctd, R_camera_matrix, R_dist_coeffs, R2, P2);
-
-				//vector<Point3f> L_3d, R_3d;
-				//for (int i = 0; i < 4; i++) {
-				//	L_3d.push_back(Point3f(L_ctd[i].x, L_ctd[i].y, L_ctd[i].x - R_ctd[i].x));
-				//	R_3d.push_back(Point3f(R_ctd[i].x, R_ctd[i].y, L_ctd[i].x - R_ctd[i].x));
-				//}
+				absdiff(roi[i], calib[i], roi_diff[i]);
 
 
-				//// get 3d points
-				//Mat L_coord, R_coord;
-				//perspectiveTransform(L_3d, L_coord, Q);
-				//perspectiveTransform(R_3d, R_coord, Q);
+			} // end for camera
 
-				// store points until nth frame
-
-				// if nth frame, determine polynomial fit, calculate z
-
-				// move catcher
-				
-
-				// update catcher if greater than nth points with new calculation
+#ifndef PTGREY
+			im_i++;
+#endif
 
 
 
+			// use difference images to detect if ball is there
+			// threshold image
+			int th = 15;
+			inRange(roi_diff[0], Scalar(0, 0, 0), Scalar(th, th, th), roi_diff[0]);
+			inRange(roi_diff[1], Scalar(0, 0, 0), Scalar(th, th, th), roi_diff[1]);
+
+			SimpleBlobDetector::Params params;
+
+			// Change thresholds
+			params.minThreshold = 100;
+			params.maxThreshold = 200;
+
+			// Filter by Area.
+			params.filterByArea = true;
+			params.minArea = 8;
+
+			// Filter by Circularity
+			params.filterByCircularity = false;
+			params.minCircularity = 0.01;
+
+			// Filter by Convexity
+			params.filterByConvexity = false;
+			params.minConvexity = 0.01;
+
+			// Filter by Inertia
+			params.filterByInertia = false;
+			params.minInertiaRatio = 0.01;
+
+			Ptr<SimpleBlobDetector> d = SimpleBlobDetector::create(params);
+			vector<KeyPoint> keypoints;
+			d->detect(roi_diff[0], keypoints);
+
+			// check to see if we found any blobs
+			if (keypoints.size() < 1){
+				continue;
 			}
+
+			// sort by blob size
+			sort(keypoints.begin(), keypoints.end(), keyPointCompare);
+
+			// display all blobs
+			//Mat test_frame;
+			//roi_diff[0].copyTo(test_frame);
+			drawKeypoints(roi_diff[0], keypoints, roi_diff[0], Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+			imshow("debug", roi_diff[0]);
+			waitKey(0);
+
+			// get center points of ball
+
+			// undistort points
+
+			//undistortPoints(L_pts, L_ctd, L_camera_matrix, L_dist_coeffs, R1, P1);
+			//undistortPoints(R_pts, R_ctd, R_camera_matrix, R_dist_coeffs, R2, P2);
+
+			//vector<Point3f> L_3d, R_3d;
+			//for (int i = 0; i < 4; i++) {
+			//	L_3d.push_back(Point3f(L_ctd[i].x, L_ctd[i].y, L_ctd[i].x - R_ctd[i].x));
+			//	R_3d.push_back(Point3f(R_ctd[i].x, R_ctd[i].y, L_ctd[i].x - R_ctd[i].x));
+			//}
+
+
+			//// get 3d points
+			//Mat L_coord, R_coord;
+			//perspectiveTransform(L_3d, L_coord, Q);
+			//perspectiveTransform(R_3d, R_coord, Q);
+
+			// store points until nth frame
+
+			// if nth frame, determine polynomial fit, calculate z
+
+			// move catcher
+
+
+			// update catcher if greater than nth points with new calculation
+
+			// if ball is no longer in image
+			// set calibrated to false
+			// set catching_ball to false
 
 		}
 		// Display Image
@@ -232,6 +304,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 					QS->IR.OutBuf[0] = QS->IR.OutBuf[1] = QS->IR.OutBuf[2] = QS->IR.SaveBuf[i][QS->IR.FrameID];
 					merge(QS->IR.OutBuf, 3, QS->IR.DispBuf[i]);
 #endif
+
 					sprintf_s(str,"%d",QS->IR.FrameID);
 					putText(QS->IR.DispBuf[0], str, Point(10, 30), FONT_HERSHEY_SIMPLEX, 1, CV_RGB(0, 255, 0), 2);
 					if (QS->IR.PlayDelay) Sleep(QS->IR.PlayDelay);
