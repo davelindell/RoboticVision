@@ -306,33 +306,40 @@ long QSProcessThreadFunc(CTCSys *QS)
 				perspectiveTransform(l_points_disparity, l_3dpoints, Q);
 
 				//determine polynomial fit, calculate z
-				int degree = 3;
+				int degreey = 3;
+				int degreex = 2;
 				double chisq;
-				gsl_matrix *Z, *cov;
+				gsl_matrix *Zx, *Zy, *covx, *covy;
 				gsl_vector *x, *y, *cx, *cy, *w;
 
-				Z = gsl_matrix_alloc(l_3dpoints.size(), degree);
+				Zx = gsl_matrix_alloc(l_3dpoints.size(), degreex);
 				x = gsl_vector_alloc(l_3dpoints.size());
+				Zy = gsl_matrix_alloc(l_3dpoints.size(), degreey);
 				y = gsl_vector_alloc(l_3dpoints.size());
 				w = gsl_vector_alloc(l_3dpoints.size());
 
-				cx = gsl_vector_alloc(degree);
-				cy = gsl_vector_alloc(degree);
-				cov = gsl_matrix_alloc(degree, degree);
+				cx = gsl_vector_alloc(degreex);
+				cy = gsl_vector_alloc(degreey);
+				covx = gsl_matrix_alloc(degreex, degreex);
+				covy = gsl_matrix_alloc(degreey, degreey);
 
 				for (int i = 0; i < l_3dpoints.size(); i++){
-					gsl_matrix_set(Z, i, 0, 1.0);
-					gsl_matrix_set(Z, i, 1, l_3dpoints[i].z);
-					gsl_matrix_set(Z, i, 2, l_3dpoints[i].z*l_3dpoints[i].z);
+					gsl_matrix_set(Zx, i, 0, 1.0);
+					gsl_matrix_set(Zx, i, 1, l_3dpoints[i].z);
+
+					gsl_matrix_set(Zy, i, 0, 1.0);
+					gsl_matrix_set(Zy, i, 1, l_3dpoints[i].z);
+					gsl_matrix_set(Zy, i, 2, l_3dpoints[i].z*l_3dpoints[i].z);
 
 					gsl_vector_set(x, i, l_3dpoints[i].x);
 					gsl_vector_set(y, i, l_3dpoints[i].y);
 					gsl_vector_set(w, i, i*i);
 				}
 
-				gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(l_3dpoints.size(), degree);
-				gsl_multifit_wlinear(Z, w, x, cx, cov, &chisq, work);
-				gsl_multifit_wlinear(Z, w, y, cy, cov, &chisq, work);
+				gsl_multifit_linear_workspace *workx = gsl_multifit_linear_alloc(l_3dpoints.size(), degreex);
+				gsl_multifit_linear_workspace *worky = gsl_multifit_linear_alloc(l_3dpoints.size(), degreey);
+				gsl_multifit_wlinear(Zx, w, x, cx, covx, &chisq, workx);
+				gsl_multifit_wlinear(Zy, w, y, cy, covy, &chisq, worky);
 
 				float x_est, y_est;
 				x_est = cx->data[0];
@@ -348,8 +355,10 @@ long QSProcessThreadFunc(CTCSys *QS)
 				SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
 
 				//cleanup
-				gsl_matrix_free(Z);
-				gsl_matrix_free(cov);
+				gsl_matrix_free(Zx);
+				gsl_matrix_free(Zy);
+				gsl_matrix_free(covx);
+				gsl_matrix_free(covy);
 				gsl_vector_free(x);
 				gsl_vector_free(y);
 				gsl_vector_free(cx);
