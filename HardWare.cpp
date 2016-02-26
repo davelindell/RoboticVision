@@ -215,6 +215,11 @@ long QSProcessThreadFunc(CTCSys *QS)
 				QS->IR.ProcBuf[0](Rect(xl, yt, width, height)).copyTo(calib[0]);
 				QS->IR.ProcBuf[1](Rect(xr, yt, width, height)).copyTo(calib[1]);
 				calibrated = true;
+
+				QS->Move_X = 0;					// replace 0 with your x coordinate
+				QS->Move_Y = 0;					// replace 0 with your y coordinate
+				SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
+
 			}
 
 			// identify ROI in L and R cameras
@@ -284,11 +289,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 			l_points.push_back(l_keypoints[0].pt);
 			r_points.push_back(r_keypoints[0].pt);
 
-			if (l_points.size() > 2) {
-
-				if (l_points.size() > 10) {
-					continue;
-				}
+			if (l_points.size() == 7 || l_points.size() == 14) {
 
 				// undistort points
 				undistortPoints(l_points, l_points_ctd, L_camera_matrix, L_dist_coeffs, R1, P1);
@@ -338,7 +339,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 
 					gsl_vector_set(x, i, l_3dpoints[i].x);
 					gsl_vector_set(y, i, l_3dpoints[i].y);
-					gsl_vector_set(w, i, i*i);
+					gsl_vector_set(w, i, i);
 				}
 
 				gsl_multifit_linear_workspace *workx = gsl_multifit_linear_alloc(l_3dpoints.size(), degreex);
@@ -382,10 +383,6 @@ long QSProcessThreadFunc(CTCSys *QS)
 				gsl_vector_free(cx);
 				gsl_vector_free(cy);
 				gsl_vector_free(w);
-
-
-
-
 			}
 
 			
