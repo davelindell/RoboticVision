@@ -91,7 +91,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 	int     BufID = 0;
 	int		xl = 290;
 	int		xr = 200;
-	int		y = 0;
+	int		yt = 0;
 	int		width = 150;
 	int		height = 280;
 	float	xoffset = 0;
@@ -185,9 +185,9 @@ long QSProcessThreadFunc(CTCSys *QS)
 		}
 #else
 		// load in training images
-		sprintf(path, "im\\Ball7L%02d.bmp", im_i);
+		sprintf(path, "im\\Ball8L%02d.bmp", im_i);
 		Mat l_im = imread(path, CV_LOAD_IMAGE_GRAYSCALE);
-		sprintf(path, "im\\Ball7R%02d.bmp", im_i);
+		sprintf(path, "im\\Ball8R%02d.bmp", im_i);
 		Mat r_im = imread(path, CV_LOAD_IMAGE_GRAYSCALE);
 
 		if (!l_im.data || !r_im.data) {
@@ -205,28 +205,32 @@ long QSProcessThreadFunc(CTCSys *QS)
 			// Images are acquired into ProcBuf[0] for left and ProcBuf[1] for right camera
 			// Need to create child image or small region of interest for processing to exclude background and speed up processing
 			// Mat child = QS->IR.ProcBuf[i](Rect(x, y, width, height));
-			for(i=0; i < QS->IR.NumCameras; i++) {
 #ifdef PTG_COLOR
 				cvtColor(QS->IR.ProcBuf[i][BufID], QS->IR.OutBuf1[i], CV_RGB2GRAY, 0);
 #else			
 
 #endif
-				// use first image as calibration image
-				if (!calibrated) {
-					QS->IR.ProcBuf[0](Rect(xl, y, width, height)).copyTo(calib[0]);
-					QS->IR.ProcBuf[1](Rect(xr, y, width, height)).copyTo(calib[1]);
-					calibrated = true;
-				}
+			// use first image as calibration image
+			if (!calibrated) {
+				QS->IR.ProcBuf[0](Rect(xl, yt, width, height)).copyTo(calib[0]);
+				QS->IR.ProcBuf[1](Rect(xr, yt, width, height)).copyTo(calib[1]);
+				calibrated = true;
+			}
 
-				// identify ROI in L and R cameras
-				roi[i] = QS->IR.ProcBuf[i](Rect(xl-90*i, y, width, height));
+				
 
-				// use difference from l_calib/r_calib to find if ball is there
-				absdiff(roi[i], calib[i], roi_diff[i]);
-				QS->IR.ProcBuf[0].copyTo(QS->IR.OutBuf[0]);
-				QS->IR.ProcBuf[1].copyTo(QS->IR.OutBuf[1]);
 
-			} // end for camera
+
+			// identify ROI in L and R cameras
+			roi[0] = QS->IR.ProcBuf[0](Rect(xl, yt, width, height));
+			roi[1] = QS->IR.ProcBuf[1](Rect(200, yt, width, height));
+
+			// use difference from l_calib/r_calib to find if ball is there
+			absdiff(roi[0], calib[0], roi_diff[0]);
+			absdiff(roi[1], calib[1], roi_diff[1]);
+
+			QS->IR.ProcBuf[0].copyTo(QS->IR.OutBuf[0]);
+			QS->IR.ProcBuf[1].copyTo(QS->IR.OutBuf[1]);
 
 #ifndef PTGREY
 			im_i++;
@@ -301,58 +305,59 @@ long QSProcessThreadFunc(CTCSys *QS)
 				vector <Point3f> l_3dpoints;
 				perspectiveTransform(l_points_disparity, l_3dpoints, Q);
 
+				//determine polynomial fit, calculate z
+				int degree = 3;
+				double chisq;
+				gsl_matrix *Z, *cov;
+				gsl_vector *x, *y, *cx, *cy, *w;
+
+				Z = gsl_matrix_alloc(l_3dpoints.size(), degree);
+				x = gsl_vector_alloc(l_3dpoints.size());
+				y = gsl_vector_alloc(l_3dpoints.size());
+				w = gsl_vector_alloc(l_3dpoints.size());
+
+				cx = gsl_vector_alloc(degree);
+				cy = gsl_vector_alloc(degree);
+				cov = gsl_matrix_alloc(degree, degree);
+
+				for (int i = 0; i < l_3dpoints.size(); i++){
+					gsl_matrix_set(Z, i, 0, 1.0);
+					gsl_matrix_set(Z, i, 1, l_3dpoints[i].z);
+					gsl_matrix_set(Z, i, 2, l_3dpoints[i].z*l_3dpoints[i].z);
+
+					gsl_vector_set(x, i, l_3dpoints[i].x);
+					gsl_vector_set(y, i, l_3dpoints[i].y);
+					gsl_vector_set(w, i, i*i);
+				}
+
+				gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(l_3dpoints.size(), degree);
+				gsl_multifit_wlinear(Z, w, x, cx, cov, &chisq, work);
+				gsl_multifit_wlinear(Z, w, y, cy, cov, &chisq, work);
+
+				float x_est, y_est;
+				x_est = cx->data[0];
+				y_est = cy->data[0];
+
+				// move estimates by offset
+				x_est = x_est + xoffset;
+				y_est = y_est + yoffset;
+
+				// move catcher
+				QS->Move_X = x_est;					// replace 0 with your x coordinate
+				QS->Move_Y = y_est;					// replace 0 with your y coordinate
+				SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
+
+				//cleanup
+				gsl_matrix_free(Z);
+				gsl_matrix_free(cov);
+				gsl_vector_free(x);
+				gsl_vector_free(y);
+				gsl_vector_free(cx);
+				gsl_vector_free(cy);
+				gsl_vector_free(w);
+
 			}
 
-			//determine polynomial fit, calculate z
-			int degree = 3;
-			double chisq;
-			gsl_matrix *Z, *cov;
-			gsl_vector *x, *y, *cx, *cy, *w;
-
-			Z = gsl_matrix_alloc(l_3dpoints.size(), degree);
-			x = gsl_vector_alloc(l_3dpoints.size());
-			y = gsl_vector_alloc(l_3dpoints.size());
-			w = gsl_vector_alloc(l_3dpoints.size());
-
-			cx = gsl_vector_alloc(degree);
-			cy = gsl_vector_alloc(degree);
-			cov = gsl_matrix_alloc(degree, degree);
-
-			for (int i = 0; i < l_3dpoints.size(); i++){
-				gsl_matrix_set(Z, i, 0, 1.0);
-				gsl_matrix_set(Z, i, 1, l_3dpoints[i].z);
-				gsl_matrix_set(Z, i, 2, l_3dpoints[i].z*l_3dpoints[i].z);
-
-				gsl_vector_set(x, i, l_3dpoints[i].x);
-				gsl_vector_set(y, i, l_3dpoints[i].y);
-				gsl_vector_set(w, i, i*i);
-			}
-
-			gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(l_3dpoints.size(), degree);
-			gsl_multifit_wlinear(Z, w, x, cx, cov, &chisq, work);
-			gsl_multifit_wlinear(Z, w, y, cy, cov, &chisq, work);
-
-			float x_est, y_est;
-			x_est = cx->data[0];
-			y_est = cy->data[0];
-
-			// move estimates by offset
-			x_est = x_est + xoffset;
-			y_est = y_est + yoffset;
-
-			// move catcher
-			QS->Move_X = x_est;					// replace 0 with your x coordinate
-			QS->Move_Y = y_est;					// replace 0 with your y coordinate
-			SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
-
-			//cleanup
-			gsl_matrix_free(Z);
-			gsl_matrix_free(cov);
-			gsl_vector_free(x);
-			gsl_vector_free(y);
-			gsl_vector_free(cx);
-			gsl_vector_free(cy);
-			gsl_vector_free(w);
 			
 		}
 		// Display Image
