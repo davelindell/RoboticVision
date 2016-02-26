@@ -217,9 +217,6 @@ long QSProcessThreadFunc(CTCSys *QS)
 				calibrated = true;
 			}
 
-				
-
-
 
 			// identify ROI in L and R cameras
 			roi[0] = QS->IR.ProcBuf[0](Rect(xl, yt, width, height));
@@ -346,8 +343,8 @@ long QSProcessThreadFunc(CTCSys *QS)
 				y_est = cy->data[0];
 
 				// move estimates by offset
-				x_est = x_est + xoffset;
-				y_est = y_est + yoffset;
+				x_est = -x_est - xoffset;
+				y_est = -y_est - yoffset;
 
 				// move catcher
 				QS->Move_X = x_est;					// replace 0 with your x coordinate
@@ -366,8 +363,6 @@ long QSProcessThreadFunc(CTCSys *QS)
 				gsl_vector_free(w);
 
 			}
-
-			
 		}
 		// Display Image
 		if (QS->IR.UpdateImage) {
