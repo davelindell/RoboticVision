@@ -103,7 +103,7 @@ long QSProcessThreadFunc(CTCSys *QS)
     FrameStamp = 0;
 
 	char path[100];
-	int im_i = 0;
+	int im_i = 20;
 
 	Mat calib[2], roi[2], roi_diff[2];
 	bool calibrated = false;
@@ -277,6 +277,10 @@ long QSProcessThreadFunc(CTCSys *QS)
 			drawKeypoints(roi_diff[0], l_keypoints, roi_diff[0], Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 			drawKeypoints(roi_diff[1], r_keypoints, roi_diff[1], Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
+			l_keypoints[0].pt.x = l_keypoints[0].pt.x + xl;
+			r_keypoints[0].pt.x = r_keypoints[0].pt.x + xr;
+
+
 			// add points to list
 			l_points.push_back(l_keypoints[0].pt);
 			r_points.push_back(r_keypoints[0].pt);
@@ -309,7 +313,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 			// store points until nth frame
 
 			// if nth frame, determine polynomial fit, calculate z
-			int degree = 3;
+			/*int degree = 3;
 			double chisq;
 			gsl_matrix *Z, *cov;
 			gsl_vector *x, *y, *cx, *cy;
@@ -333,7 +337,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 
 			gsl_multifit_linear_workspace * work = gsl_multifit_linear_alloc(dataPoints.size(), degree);
 			gsl_multifit_linear(Z, x, cx, cov, &chisq, work);
-			gsl_multifit_linear(Z, y, cy, cov, &chisq, work);
+			gsl_multifit_linear(Z, y, cy, cov, &chisq, work);*/
 
 
 			// move catcher
