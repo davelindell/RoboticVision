@@ -3,7 +3,6 @@
 #include "math.h"
 #include "Hardware.h"
 #include <fstream>
-#include <gsl/gsl_multifit.h>
 
 ImagingResources	CTCSys::IR;
 
@@ -184,9 +183,9 @@ long QSProcessThreadFunc(CTCSys *QS)
 		}
 #else
 		// load in training images
-		sprintf(path, "im\\Ball8L%02d.bmp", im_i);
+		sprintf(path, "im\\Ball7L%02d.bmp", im_i);
 		Mat l_im = imread(path, CV_LOAD_IMAGE_GRAYSCALE);
-		sprintf(path, "im\\Ball8R%02d.bmp", im_i);
+		sprintf(path, "im\\Ball7R%02d.bmp", im_i);
 		Mat r_im = imread(path, CV_LOAD_IMAGE_GRAYSCALE);
 
 		if (!l_im.data || !r_im.data) {
@@ -222,15 +221,14 @@ long QSProcessThreadFunc(CTCSys *QS)
 
 				// use difference from l_calib/r_calib to find if ball is there
 				absdiff(roi[i], calib[i], roi_diff[i]);
-
+				QS->IR.ProcBuf[0].copyTo(QS->IR.OutBuf[0]);
+				QS->IR.ProcBuf[1].copyTo(QS->IR.OutBuf[1]);
 
 			} // end for camera
 
 #ifndef PTGREY
 			im_i++;
 #endif
-
-
 
 			// use difference images to detect if ball is there
 			// threshold image
@@ -313,43 +311,52 @@ long QSProcessThreadFunc(CTCSys *QS)
 			// store points until nth frame
 
 			// if nth frame, determine polynomial fit, calculate z
-			/*int degree = 3;
-			double chisq;
-			gsl_matrix *Z, *cov;
-			gsl_vector *x, *y, *cx, *cy;
+				int degree = 3;
+				double chisq;
+				gsl_matrix *Z, *cov;
+				gsl_vector *x, *y, *cx, *cy, *w;
 
-			Z = gsl_matrix_alloc(dataPoints.size(), degree);
-			x = gsl_vector_alloc(dataPoints.size());
-			y = gsl_vector_alloc(dataPoints.size());
+				Z = gsl_matrix_alloc(l_3dpoints.size(), degree);
+				x = gsl_vector_alloc(l_3dpoints.size());
+				y = gsl_vector_alloc(l_3dpoints.size());
+				w = gsl_vector_alloc(l_3dpoints.size());
 
-			cx = gsl_vector_alloc(degree);
-			cy = gsl_vector_alloc(degree);
-			cov = gsl_matrix_alloc(degree, degree);
+				cx = gsl_vector_alloc(degree);
+				cy = gsl_vector_alloc(degree);
+				cov = gsl_matrix_alloc(degree, degree);
 
-			for (int i = 0; i < dataPoints.size(); i++){
-				gsl_matrix_set(Z, i, 0, 1.0);
-				gsl_matrix_set(Z, i, 1, dataPoints[i].z);
-				gsl_matrix_set(Z, i, 2, dataPoints[i].z*dataPoints[i].z);
+				for (int i = 0; i < l_3dpoints.size(); i++){
+					gsl_matrix_set(Z, i, 0, 1.0);
+					gsl_matrix_set(Z, i, 1, l_3dpoints[i].z);
+					gsl_matrix_set(Z, i, 2, l_3dpoints[i].z*l_3dpoints[i].z);
 
-				gsl_vector_set(x, i, dataPoints[i].x);
-				gsl_vector_set(y, i, dataPoints[i].y);
+					gsl_vector_set(x, i, l_3dpoints[i].x);
+					gsl_vector_set(y, i, l_3dpoints[i].y);
+					gsl_vector_set(w, i, i*i);
+				}
+
+				gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(l_3dpoints.size(), degree);
+				gsl_multifit_wlinear(Z, w, x, cx, cov, &chisq, work);
+				gsl_multifit_wlinear(Z, w, y, cy, cov, &chisq, work);
+
+				float x_est, y_est;
+				x_est = cx->data[0];
+				y_est = cy->data[0];
+
+				// move catcher
+				QS->Move_X = x_est;					// replace 0 with your x coordinate
+				QS->Move_Y = y_est;					// replace 0 with your y coordinate
+				SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
+
+				//cleanup
+				gsl_matrix_free(Z);
+				gsl_matrix_free(cov);
+				gsl_vector_free(x);
+				gsl_vector_free(y);
+				gsl_vector_free(cx);
+				gsl_vector_free(cy);
+				gsl_vector_free(w);
 			}
-
-			gsl_multifit_linear_workspace * work = gsl_multifit_linear_alloc(dataPoints.size(), degree);
-			gsl_multifit_linear(Z, x, cx, cov, &chisq, work);
-			gsl_multifit_linear(Z, y, cy, cov, &chisq, work);*/
-
-
-			// move catcher
-
-
-			// update catcher if greater than nth points with new calculation
-
-			// if ball is no longer in image
-			// set calibrated to false
-			// set catching_ball to false
-			// clear out point vectors
-
 		}
 		// Display Image
 		if (QS->IR.UpdateImage) {
