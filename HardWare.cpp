@@ -94,8 +94,8 @@ long QSProcessThreadFunc(CTCSys *QS)
 	int		yt = 0;
 	int		width = 150;
 	int		height = 280;
-	float	xoffset = 0;
-	float	yoffset = 0;
+	float	xoffset = 8;
+	float	yoffset = 21;
 	char    str[32];
     long	FrameStamp;
     
@@ -217,7 +217,6 @@ long QSProcessThreadFunc(CTCSys *QS)
 				calibrated = true;
 			}
 
-
 			// identify ROI in L and R cameras
 			roi[0] = QS->IR.ProcBuf[0](Rect(xl, yt, width, height));
 			roi[1] = QS->IR.ProcBuf[1](Rect(200, yt, width, height));
@@ -258,6 +257,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 					l_points_ctd.clear();
 					r_points_ctd.clear();
 					im_i = 0;
+
 					while (QS->IR.CatchBall) {
 						;;
 					}
@@ -267,7 +267,6 @@ long QSProcessThreadFunc(CTCSys *QS)
 				continue;
 			}
 
-			
 			detected_ball = true;
 
 			// sort by blob size
@@ -275,18 +274,22 @@ long QSProcessThreadFunc(CTCSys *QS)
 			sort(r_keypoints.begin(), r_keypoints.end(), keyPointCompare);
 
 			// display all blobs
-			drawKeypoints(roi_diff[0], l_keypoints, roi_diff[0], Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-			drawKeypoints(roi_diff[1], r_keypoints, roi_diff[1], Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+			//drawKeypoints(roi_diff[0], l_keypoints, roi_diff[0], Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+			//drawKeypoints(roi_diff[1], r_keypoints, roi_diff[1], Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
 			l_keypoints[0].pt.x = l_keypoints[0].pt.x + xl;
 			r_keypoints[0].pt.x = r_keypoints[0].pt.x + xr;
-
 
 			// add points to list
 			l_points.push_back(l_keypoints[0].pt);
 			r_points.push_back(r_keypoints[0].pt);
 
-			if (l_points.size() > 4) {
+			if (l_points.size() > 2) {
+
+				if (l_points.size() > 10) {
+					continue;
+				}
+
 				// undistort points
 				undistortPoints(l_points, l_points_ctd, L_camera_matrix, L_dist_coeffs, R1, P1);
 				undistortPoints(r_points, r_points_ctd, R_camera_matrix, R_dist_coeffs, R2, P2);
@@ -302,6 +305,11 @@ long QSProcessThreadFunc(CTCSys *QS)
 				vector <Point3f> l_3dpoints;
 				perspectiveTransform(l_points_disparity, l_3dpoints, Q);
 
+				for (int ii = 0; ii < l_3dpoints.size(); ii++) {
+					if (l_3dpoints[ii].z > 400 || l_3dpoints[ii].z < 100) {
+						l_3dpoints.erase(l_3dpoints.begin() + ii);
+					}
+				}
 				//determine polynomial fit, calculate z
 				int degreey = 3;
 				int degreex = 2;
@@ -343,13 +351,26 @@ long QSProcessThreadFunc(CTCSys *QS)
 				y_est = cy->data[0];
 
 				// move estimates by offset
-				x_est = -x_est - xoffset;
-				y_est = -y_est - yoffset;
+				x_est = -x_est + xoffset;
+				y_est = -y_est + yoffset;
 
 				// move catcher
 				QS->Move_X = x_est;					// replace 0 with your x coordinate
 				QS->Move_Y = y_est;					// replace 0 with your y coordinate
 				SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
+
+				ofstream ofs;
+				ofs.open("points.txt", ofstream::out);
+				ofs << "x: " << x_est << endl;
+				ofs << "y: " << y_est << endl;
+				ofs << "3dpts: " << l_3dpoints << endl;
+				for (int jj = 0; jj < 2; jj++) {
+					ofs << "cx: " << cx->data[jj] << endl;
+				}
+				for (int jj = 0; jj < 3; jj++) {
+					ofs << "cy: " << cy->data[jj] << endl;
+				}
+				ofs.close();
 
 				//cleanup
 				gsl_matrix_free(Zx);
@@ -362,7 +383,12 @@ long QSProcessThreadFunc(CTCSys *QS)
 				gsl_vector_free(cy);
 				gsl_vector_free(w);
 
+
+
+
 			}
+
+			
 		}
 		// Display Image
 		if (QS->IR.UpdateImage) {
