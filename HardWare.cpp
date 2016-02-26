@@ -94,6 +94,8 @@ long QSProcessThreadFunc(CTCSys *QS)
 	int		y = 0;
 	int		width = 150;
 	int		height = 280;
+	float	xoffset = 0;
+	float	yoffset = 0;
 	char    str[32];
     long	FrameStamp;
     
@@ -301,62 +303,57 @@ long QSProcessThreadFunc(CTCSys *QS)
 
 			}
 
-			//// get 3d points
-			//Mat L_coord, R_coord;
-			vector<Point3f> dataPoints;
-			//perspectiveTransform(L_3d, L_coord, Q);
-			//perspectiveTransform(R_3d, R_coord, Q);
+			//determine polynomial fit, calculate z
+			int degree = 3;
+			double chisq;
+			gsl_matrix *Z, *cov;
+			gsl_vector *x, *y, *cx, *cy, *w;
 
+			Z = gsl_matrix_alloc(l_3dpoints.size(), degree);
+			x = gsl_vector_alloc(l_3dpoints.size());
+			y = gsl_vector_alloc(l_3dpoints.size());
+			w = gsl_vector_alloc(l_3dpoints.size());
 
-			// store points until nth frame
+			cx = gsl_vector_alloc(degree);
+			cy = gsl_vector_alloc(degree);
+			cov = gsl_matrix_alloc(degree, degree);
 
-			// if nth frame, determine polynomial fit, calculate z
-				int degree = 3;
-				double chisq;
-				gsl_matrix *Z, *cov;
-				gsl_vector *x, *y, *cx, *cy, *w;
+			for (int i = 0; i < l_3dpoints.size(); i++){
+				gsl_matrix_set(Z, i, 0, 1.0);
+				gsl_matrix_set(Z, i, 1, l_3dpoints[i].z);
+				gsl_matrix_set(Z, i, 2, l_3dpoints[i].z*l_3dpoints[i].z);
 
-				Z = gsl_matrix_alloc(l_3dpoints.size(), degree);
-				x = gsl_vector_alloc(l_3dpoints.size());
-				y = gsl_vector_alloc(l_3dpoints.size());
-				w = gsl_vector_alloc(l_3dpoints.size());
-
-				cx = gsl_vector_alloc(degree);
-				cy = gsl_vector_alloc(degree);
-				cov = gsl_matrix_alloc(degree, degree);
-
-				for (int i = 0; i < l_3dpoints.size(); i++){
-					gsl_matrix_set(Z, i, 0, 1.0);
-					gsl_matrix_set(Z, i, 1, l_3dpoints[i].z);
-					gsl_matrix_set(Z, i, 2, l_3dpoints[i].z*l_3dpoints[i].z);
-
-					gsl_vector_set(x, i, l_3dpoints[i].x);
-					gsl_vector_set(y, i, l_3dpoints[i].y);
-					gsl_vector_set(w, i, i*i);
-				}
-
-				gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(l_3dpoints.size(), degree);
-				gsl_multifit_wlinear(Z, w, x, cx, cov, &chisq, work);
-				gsl_multifit_wlinear(Z, w, y, cy, cov, &chisq, work);
-
-				float x_est, y_est;
-				x_est = cx->data[0];
-				y_est = cy->data[0];
-
-				// move catcher
-				QS->Move_X = x_est;					// replace 0 with your x coordinate
-				QS->Move_Y = y_est;					// replace 0 with your y coordinate
-				SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
-
-				//cleanup
-				gsl_matrix_free(Z);
-				gsl_matrix_free(cov);
-				gsl_vector_free(x);
-				gsl_vector_free(y);
-				gsl_vector_free(cx);
-				gsl_vector_free(cy);
-				gsl_vector_free(w);
+				gsl_vector_set(x, i, l_3dpoints[i].x);
+				gsl_vector_set(y, i, l_3dpoints[i].y);
+				gsl_vector_set(w, i, i*i);
 			}
+
+			gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(l_3dpoints.size(), degree);
+			gsl_multifit_wlinear(Z, w, x, cx, cov, &chisq, work);
+			gsl_multifit_wlinear(Z, w, y, cy, cov, &chisq, work);
+
+			float x_est, y_est;
+			x_est = cx->data[0];
+			y_est = cy->data[0];
+
+			// move estimates by offset
+			x_est = x_est + xoffset;
+			y_est = y_est + yoffset;
+
+			// move catcher
+			QS->Move_X = x_est;					// replace 0 with your x coordinate
+			QS->Move_Y = y_est;					// replace 0 with your y coordinate
+			SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
+
+			//cleanup
+			gsl_matrix_free(Z);
+			gsl_matrix_free(cov);
+			gsl_vector_free(x);
+			gsl_vector_free(y);
+			gsl_vector_free(cx);
+			gsl_vector_free(cy);
+			gsl_vector_free(w);
+			
 		}
 		// Display Image
 		if (QS->IR.UpdateImage) {
