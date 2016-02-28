@@ -89,16 +89,18 @@ long QSProcessThreadFunc(CTCSys *QS)
 
 	int     i;
 	int     BufID = 0;
-	int		xl = 290;
-	int		xr = 200;
+	int		xl = 310;
+	int		xr = 220;
 	int		yt = 0;
-	int		width = 150;
+	int		width = 130;
 	int		height = 280;
-	float	xoffset = 8;
-	float	yoffset = 21;
+	int		wf = 5;
+	float	xoffset = 13;
+	float	yoffset = 9;
 	char    str[32];
     long	FrameStamp;
-    
+	int num_updates = 0;
+
 	vector<Point2f> l_points, r_points, l_points_ctd, r_points_ctd;
 	vector<Point3f> l_3dpoints;
     FrameStamp = 0;
@@ -109,18 +111,22 @@ long QSProcessThreadFunc(CTCSys *QS)
 	Mat calib[2], roi[2], roi_diff[2];
 	bool calibrated = false;
 	bool detected_ball = false;
+	bool first_ball = true;
+	vector<Point2f> l_prev_ball_location(1);
+	vector<Point2f> r_prev_ball_location(1);
 
 	// read calibration params
 	// read yml file
 	FileStorage L_fs("cal\\l_camera.yml", FileStorage::READ);
 	FileStorage R_fs("cal\\r_camera.yml", FileStorage::READ);
 	FileStorage fs("cal\\rectify.yml", FileStorage::READ);
+	FileStorage fshill("cal\\parameters.yml", FileStorage::READ);
 
 	Mat L_camera_matrix, L_dist_coeffs;
 	Mat R_camera_matrix, R_dist_coeffs;
 	Mat R1, R2, P1, P2, Q;
 
-	L_fs["cameraMatrix"] >> L_camera_matrix;
+	/*L_fs["cameraMatrix"] >> L_camera_matrix;
 	L_fs["distCoeffs"] >> L_dist_coeffs;
 	R_fs["cameraMatrix"] >> R_camera_matrix;
 	R_fs["distCoeffs"] >> R_dist_coeffs;
@@ -128,11 +134,22 @@ long QSProcessThreadFunc(CTCSys *QS)
 	fs["R2"] >> R2;
 	fs["P1"] >> P1;
 	fs["P2"] >> P2;
-	fs["Q"] >> Q;
+	fs["Q"] >> Q;*/
+
+	fshill["intrinsicL"] >> L_camera_matrix;
+	fshill["distortionL"] >> L_dist_coeffs;
+	fshill["intrinsicR"] >> R_camera_matrix;
+	fshill["distortionR"] >> R_dist_coeffs;
+	fshill["R1"] >> R1;
+	fshill["R2"] >> R2;
+	fshill["P1"] >> P1;
+	fshill["P2"] >> P2;
+	fshill["Q"] >> Q;
 
 	fs.release();
 	L_fs.release();
 	R_fs.release();
+	fshill.release();
 
 	// Initialize the catcher.  QS->moveX and QS->moveY (both in inches) must be calculated and set first.
 	QS->Move_X = 0;					// replace 0 with your x coordinate
@@ -146,7 +163,8 @@ long QSProcessThreadFunc(CTCSys *QS)
 	params.minThreshold = 100;
 	params.maxThreshold = 255;
 	params.filterByArea = true;
-	params.minArea = 3;
+	params.minArea = 10;
+	params.maxArea = 500;
 	params.filterByCircularity = false;
 	params.minCircularity = 0.01;
 	params.filterByConvexity = false;
@@ -206,7 +224,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 			// Need to create child image or small region of interest for processing to exclude background and speed up processing
 			// Mat child = QS->IR.ProcBuf[i](Rect(x, y, width, height));
 #ifdef PTG_COLOR
-				cvtColor(QS->IR.ProcBuf[i][BufID], QS->IR.OutBuf1[i], CV_RGB2GRAY, 0);
+			cvtColor(QS->IR.ProcBuf[i][BufID], QS->IR.OutBuf1[i], CV_RGB2GRAY, 0);
 #else			
 
 #endif
@@ -251,36 +269,86 @@ long QSProcessThreadFunc(CTCSys *QS)
 
 			// check to see if we found any blobs
 			if (l_keypoints.size() < 1 || r_keypoints.size() < 1){
-
-				// have we already been tracking the ball?
-				if (detected_ball) {
-					//cleanup
-					detected_ball = false;
-					calibrated = false;
-					l_points.clear();
-					r_points.clear();
-					l_points_ctd.clear();
-					r_points_ctd.clear();
-					im_i = 0;
-
-					while (QS->IR.CatchBall) {
-						;;
-					}
-
-				}
-
 				continue;
 			}
 
 			detected_ball = true;
 
+
+
 			// sort by blob size
 			sort(l_keypoints.begin(), l_keypoints.end(), keyPointCompare);
 			sort(r_keypoints.begin(), r_keypoints.end(), keyPointCompare);
 
+			// track ball location, constrain to nearest to prev ball
+			//if (first_ball) {
+			//	l_prev_ball_location[0].x = l_keypoints[0].pt.x;
+			//	l_prev_ball_location[0].y = l_keypoints[0].pt.y;
+			//	r_prev_ball_location[0].x = r_keypoints[0].pt.x;
+			//	r_prev_ball_location[0].y = r_keypoints[0].pt.y;
+			//	first_ball = false;
+			//}
+			//else {
+			//	float cur_x;
+			//	float cur_y;
+			//	float cur_dist;
+			//	float prev_x = l_prev_ball_location[0].x;
+			//	float prev_y = l_prev_ball_location[0].y;
+			//	float min_dist = INT_MAX;
+			//	int min_dist_ind = -1;
+			//	// left 
+			//	for (int j = 0; j < l_keypoints.size(); j++) {
+			//		cur_x = l_keypoints[j].pt.x;
+			//		cur_y = l_keypoints[j].pt.y;
+			//		cur_dist = sqrt(pow((prev_x - cur_x), 2) + pow((prev_y - cur_y), 2));
+
+			//		if (cur_dist < min_dist) {
+			//			min_dist = cur_dist;
+			//			min_dist_ind = j;
+			//		}
+			//	}
+			//	l_keypoints[0] = l_keypoints[min_dist_ind];
+
+			//	// right
+			//	prev_x = r_prev_ball_location[0].x;
+			//	prev_y = r_prev_ball_location[0].y;
+			//	min_dist = INT_MAX;
+			//	min_dist_ind = -1;
+			//	for (int j = 0; j < l_keypoints.size(); j++) {
+			//		cur_x = r_keypoints[j].pt.x;
+			//		cur_y = r_keypoints[j].pt.y;
+			//		cur_dist = sqrt(pow((prev_x - cur_x), 2) + pow((prev_y - cur_y), 2));
+
+			//		if (cur_dist < min_dist) {
+			//			min_dist = cur_dist;
+			//			min_dist_ind = j;
+			//		}
+			//	}
+			//	r_keypoints[0] = r_keypoints[min_dist_ind];
+
+			//	l_prev_ball_location[0].x = l_keypoints[0].pt.x;
+			//	l_prev_ball_location[0].y = l_keypoints[0].pt.y;
+			//	r_prev_ball_location[0].x = r_keypoints[0].pt.x;
+			//	r_prev_ball_location[0].y = r_keypoints[0].pt.y;
+			//}
+
+
+
 			// display all blobs
+			//cvtColor(roi_diff[0], roi_diff[0], CV_GRAY2BGR);
+			//cvtColor(roi_diff[1], roi_diff[1], CV_GRAY2BGR);
+
 			//drawKeypoints(roi_diff[0], l_keypoints, roi_diff[0], Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 			//drawKeypoints(roi_diff[1], r_keypoints, roi_diff[1], Scalar(0, 0, 255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+			//char diff_path[20];
+			//sprintf(diff_path, "diff\\L%02d.bmp", l_points.size());
+			//imwrite(diff_path, roi_diff[0]);
+			//sprintf(diff_path, "diff\\R%02d.bmp", l_points.size());
+			//imwrite(diff_path, roi_diff[1]);
+
+			//cvtColor(roi_diff[0], roi_diff[0], CV_BGR2GRAY);
+			//cvtColor(roi_diff[1], roi_diff[1], CV_BGR2GRAY);
 
 			l_keypoints[0].pt.x = l_keypoints[0].pt.x + xl;
 			r_keypoints[0].pt.x = r_keypoints[0].pt.x + xr;
@@ -289,7 +357,9 @@ long QSProcessThreadFunc(CTCSys *QS)
 			l_points.push_back(l_keypoints[0].pt);
 			r_points.push_back(r_keypoints[0].pt);
 
-			if (l_points.size() == 7 || l_points.size() == 14) {
+			int first = 5;
+			int second = 17;
+			if (l_points.size() == first || l_points.size() == second) {
 
 				// undistort points
 				undistortPoints(l_points, l_points_ctd, L_camera_matrix, L_dist_coeffs, R1, P1);
@@ -306,23 +376,61 @@ long QSProcessThreadFunc(CTCSys *QS)
 				vector <Point3f> l_3dpoints;
 				perspectiveTransform(l_points_disparity, l_3dpoints, Q);
 
-				for (int ii = 0; ii < l_3dpoints.size(); ii++) {
-					if (l_3dpoints[ii].z > 400 || l_3dpoints[ii].z < 100) {
-						l_3dpoints.erase(l_3dpoints.begin() + ii);
+
+				if (l_points.size() != first) {
+					l_3dpoints.erase(l_3dpoints.begin());
+					for (int ii = 0; ii < l_3dpoints.size(); ii++) {
+						if (l_3dpoints[ii].z > 500 || l_3dpoints[ii].z < 100) {
+							l_3dpoints.erase(l_3dpoints.begin() + ii);
+							ii--;
+						}
+					}
+
+					float zprev;
+					for (int ii = 0; ii < l_3dpoints.size(); ii++) {
+						if (ii == 0) {
+							zprev = l_3dpoints[ii].z;
+						}
+						else {
+							if (l_3dpoints[ii].z > zprev + 3) {
+								l_3dpoints.erase(l_3dpoints.begin() + ii);
+								zprev = l_3dpoints[ii].z;
+								ii--;
+							}
+							else {
+								zprev = l_3dpoints[ii].z;
+							}
+						}
 					}
 				}
+
+
+
+
+				// smooth estimate
+				//for (int ii = 0; ii < l_3dpoints.size() - 4; ii++) {
+				//	//l_3dpoints[ii].x = (l_3dpoints[ii].x + l_3dpoints[ii + 1].x + l_3dpoints[ii + 2].x) / 2;
+				//	l_3dpoints[ii].y = (l_3dpoints[ii].y + l_3dpoints[ii + 1].y + l_3dpoints[ii + 2].y) / 2;
+				//	l_3dpoints[ii].z = (l_3dpoints[ii].z + l_3dpoints[ii + 1].z + l_3dpoints[ii + 2].z) / 2;
+
+				//}
+
+
+
+
 				//determine polynomial fit, calculate z
 				int degreey = 3;
 				int degreex = 2;
 				double chisq;
 				gsl_matrix *Zx, *Zy, *covx, *covy;
-				gsl_vector *x, *y, *cx, *cy, *w;
+				gsl_vector *x, *y, *cx, *cy, *wx, *wy;
 
 				Zx = gsl_matrix_alloc(l_3dpoints.size(), degreex);
 				x = gsl_vector_alloc(l_3dpoints.size());
 				Zy = gsl_matrix_alloc(l_3dpoints.size(), degreey);
 				y = gsl_vector_alloc(l_3dpoints.size());
-				w = gsl_vector_alloc(l_3dpoints.size());
+				wx = gsl_vector_alloc(l_3dpoints.size());
+				wy = gsl_vector_alloc(l_3dpoints.size());
 
 				cx = gsl_vector_alloc(degreex);
 				cy = gsl_vector_alloc(degreey);
@@ -339,13 +447,14 @@ long QSProcessThreadFunc(CTCSys *QS)
 
 					gsl_vector_set(x, i, l_3dpoints[i].x);
 					gsl_vector_set(y, i, l_3dpoints[i].y);
-					gsl_vector_set(w, i, i);
+					gsl_vector_set(wy, i, wf*i);
+					gsl_vector_set(wx, i, 1);
 				}
 
 				gsl_multifit_linear_workspace *workx = gsl_multifit_linear_alloc(l_3dpoints.size(), degreex);
 				gsl_multifit_linear_workspace *worky = gsl_multifit_linear_alloc(l_3dpoints.size(), degreey);
-				gsl_multifit_wlinear(Zx, w, x, cx, covx, &chisq, workx);
-				gsl_multifit_wlinear(Zy, w, y, cy, covy, &chisq, worky);
+				gsl_multifit_wlinear(Zx, wx, x, cx, covx, &chisq, workx);
+				gsl_multifit_wlinear(Zy, wy, y, cy, covy, &chisq, worky);
 
 				float x_est, y_est;
 				x_est = cx->data[0];
@@ -354,13 +463,37 @@ long QSProcessThreadFunc(CTCSys *QS)
 				// move estimates by offset
 				x_est = -x_est + xoffset;
 				y_est = -y_est + yoffset;
+				
+				if (l_points.size() == first) {
+					y_est = y_est - 1;
+				}
+
+
+				// additional offset by quadrant
+				//if (x_est < 2 && x_est < -2) {
+				//	x_est = x_est+2;
+				//	y_est = y_est - 1;
+				//}
+				//else if (x_est > 2) {
+				//	x_est = x_est - 3;
+				//}
+				//else if (x_est < -2) {
+				//	x_est = x_est + 2;
+				//	if (y_est > 3) {
+				//		y_est = y_est -1.5;
+				//	}
+				//	else if (y_est < -4) {
+				//		y_est = y_est + 1;
+				//	}
+				//}
 
 				// move catcher
 				QS->Move_X = x_est;					// replace 0 with your x coordinate
 				QS->Move_Y = y_est;					// replace 0 with your y coordinate
 				SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
+				num_updates++;
 
-				ofstream ofs;
+				/*ofstream ofs;
 				ofs.open("points.txt", ofstream::out);
 				ofs << "x: " << x_est << endl;
 				ofs << "y: " << y_est << endl;
@@ -371,7 +504,7 @@ long QSProcessThreadFunc(CTCSys *QS)
 				for (int jj = 0; jj < 3; jj++) {
 					ofs << "cy: " << cy->data[jj] << endl;
 				}
-				ofs.close();
+				ofs.close();*/
 
 				//cleanup
 				gsl_matrix_free(Zx);
@@ -382,7 +515,28 @@ long QSProcessThreadFunc(CTCSys *QS)
 				gsl_vector_free(y);
 				gsl_vector_free(cx);
 				gsl_vector_free(cy);
-				gsl_vector_free(w);
+				gsl_vector_free(wx);
+				gsl_vector_free(wy);
+			}
+
+
+			if (num_updates == 2) {
+				//cleanup
+				detected_ball = false;
+				calibrated = false;
+				first_ball = true;
+				l_points.clear();
+				r_points.clear();
+				l_points_ctd.clear();
+				r_points_ctd.clear();
+				im_i = 0;
+				num_updates = 0;
+				//while (QS->IR.CatchBall) {
+				//	;;
+				//}
+				Sleep(2000);
+				QS->IR.ProcBuf[0](Rect(xl, yt, width, height)).copyTo(calib[0]);
+				QS->IR.ProcBuf[1](Rect(xr, yt, width, height)).copyTo(calib[1]);
 			}
 
 			
