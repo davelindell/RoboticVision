@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<merger version="3"><dataSet config="main"><source path="/home/lindell/AndroidStudioProjects/AutoBlackjack/openCVLibrary310/src/main/assets"/></dataSet><dataSet config="release"><source path="/home/lindell/AndroidStudioProjects/AutoBlackjack/openCVLibrary310/src/release/assets"/></dataSet></merger>
+<merger version="3"><dataSet config="main"><source path="C:\Users\davel\Documents\GitHub\AutoBlackjack\openCVLibrary310\src\main\assets"/></dataSet><dataSet config="release"><source path="C:\Users\davel\Documents\GitHub\AutoBlackjack\openCVLibrary310\src\release\assets"/></dataSet></merger>

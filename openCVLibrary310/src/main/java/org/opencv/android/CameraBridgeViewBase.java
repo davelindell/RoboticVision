@@ -412,6 +412,10 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
                 Log.d(TAG, "mStretch value: " + mScale);
 
                 if (mScale != 0) {
+                    //canvas.drawBitmap(mCacheBitmap, new Rect(0,0,mCacheBitmap.getWidth(), mCacheBitmap.getHeight()),
+                     //       new Rect(0,0,canvas.getWidth(),canvas.getHeight()) ,null);
+
+
                     canvas.drawBitmap(mCacheBitmap, new Rect(0,0,mCacheBitmap.getWidth(), mCacheBitmap.getHeight()),
                          new Rect((int)((canvas.getWidth() - mScale*mCacheBitmap.getWidth()) / 2),
                          (int)((canvas.getHeight() - mScale*mCacheBitmap.getHeight()) / 2),

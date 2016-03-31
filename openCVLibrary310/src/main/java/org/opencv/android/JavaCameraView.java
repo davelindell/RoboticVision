@@ -1,5 +1,6 @@
 package org.opencv.android;
 
+import java.lang.reflect.Method;
 import java.util.List;
 
 import android.content.Context;
@@ -134,6 +135,7 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
             if (mCamera == null)
                 return false;
 
+
             /* Now set camera parameters */
             try {
                 Camera.Parameters params = mCamera.getParameters();
@@ -143,6 +145,8 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
                 if (sizes != null) {
                     /* Select the size that fits surface considering maximum size allowed */
                     Size frameSize = calculateCameraFrameSize(sizes, new JavaCameraSizeAccessor(), width, height);
+                    frameSize = new Size(sizes.get(0).width,sizes.get(0).height);
+                    //frameSize = new Size(sizes.get(0).height, sizes.get(0).width);
 
                     params.setPreviewFormat(ImageFormat.NV21);
                     Log.d(TAG, "Set preview size to " + Integer.valueOf((int)frameSize.width) + "x" + Integer.valueOf((int)frameSize.height));
@@ -194,7 +198,8 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
                         mCamera.setPreviewTexture(mSurfaceTexture);
                     } else
                        mCamera.setPreviewDisplay(null);
-
+//                    setDisplayOrientation(mCamera,90);
+//                    mCamera.setPreviewDisplay(getHolder());
                     /* Finally we are ready to start the preview */
                     Log.d(TAG, "startPreview");
                     mCamera.startPreview();
@@ -209,6 +214,7 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
 
         return result;
     }
+
 
     protected void releaseCamera() {
         synchronized (this) {
