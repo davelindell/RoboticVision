@@ -45,11 +45,16 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.view.SurfaceView;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageView;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
@@ -91,6 +96,16 @@ public class BlackjackActivity extends Activity implements CameraBridgeViewBase.
 
     private int num_cards_detected = 0;
     private Mat current_frame;
+    private ImageView imView;
+    private int imThresh = 150;
+    private Button upThresh;
+    private Button downThresh;
+
+    private List<String> player_cards = null;
+    private List<Card> player_values = null;
+    private List<String> dealer_cards = null;
+    private List<Card> dealer_values = null;
+    private IdentifyCardsAsync identifyCardsAsync;
 
     private BaseLoaderCallback  mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -135,6 +150,33 @@ public class BlackjackActivity extends Activity implements CameraBridgeViewBase.
         final PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         this.mWakeLock = pm.newWakeLock(PowerManager.SCREEN_DIM_WAKE_LOCK, "My Tag");
         this.mWakeLock.acquire();
+
+        this.imView = (ImageView) findViewById(R.id.imageView);
+
+        this.upThresh = (Button) findViewById(R.id.upButton);
+        upThresh.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (imThresh + 5 > 255) {
+                    imThresh = 255;
+                }
+                else
+                    imThresh = imThresh + 5;
+            }
+        });
+        this.downThresh = (Button) findViewById(R.id.downButton);
+        downThresh.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (imThresh - 5 < 0) {
+                    imThresh = 0;
+                }
+                else
+                    imThresh = imThresh - 5;
+            }
+        });
+
+        identifyCardsAsync = null;
     }
 
     @Override
@@ -171,35 +213,70 @@ public class BlackjackActivity extends Activity implements CameraBridgeViewBase.
         List<Mat> cards = new ArrayList<>();
         List<Point> centers = new ArrayList<>();
         detectCards(mRgba, cards, centers);
-        current_frame = mRgba;
 
-        int new_num_cards_detected = cards.size();
+        //int new_num_cards_detected = cards.size();
 //        if (new_num_cards_detected == num_cards_detected) {
 //            return current_frame;
 //        }
 
-        num_cards_detected = new_num_cards_detected;
+//        num_cards_detected = new_num_cards_detected;
         List<String> player_cards = new ArrayList<>();
         List<String> dealer_cards = new ArrayList<>();
         List<Card> player_values = new ArrayList<>();
         List<Card> dealer_values = new ArrayList<>();
-        identifyCards(cards, centers, player_cards, player_values, dealer_cards, dealer_values);
 
-
-        Card dealer_card = dealer_values.get(0);
-        blackjack.decide(player_values,dealer_card);
-
-        int x_pos = divideIdx + 100;
-        for (int i = 0; i < player_cards.size(); i++) {
-            Imgproc.putText(mRgba,player_cards.get(i),new Point(x_pos+i*100,100),Core.FONT_HERSHEY_PLAIN,2,new Scalar(255,0,0),3);
+        if (identifyCardsAsync == null || identifyCardsAsync.getStatus() != AsyncTask.Status.FINISHED) {
+            identifyCardsAsync = new IdentifyCardsAsync(cards, centers, player_cards, player_values, dealer_cards, dealer_values);
+            identifyCardsAsync.execute(null, null, null);
         }
-        x_pos = 100;
-        for (int i = 0; i < dealer_cards.size(); i++) {
-            Imgproc.putText(mRgba,dealer_cards.get(i),new Point(x_pos+i*100,100),Core.FONT_HERSHEY_PLAIN,2,new Scalar(255,0,0),3);
+
+        //List<Mat>,List<Point>,List<String>,List<Card>,
+        //List<String>,List<Card>
+
+
+//        Card dealer_card = dealer_values.get(0);
+//        blackjack.decide(player_values,dealer_card);
+
+        if (this.player_cards != null && this.dealer_cards != null) {
+            int x_pos = divideIdx + 100;
+            for (int i = 0; i < this.player_cards.size(); i++) {
+                Imgproc.putText(mRgba, this.player_cards.get(i), new Point(x_pos + i * 100, 100), Core.FONT_HERSHEY_PLAIN, 2, new Scalar(255, 0, 0), 3);
+            }
+            x_pos = 100;
+            for (int i = 0; i < this.dealer_cards.size(); i++) {
+                Imgproc.putText(mRgba, this.dealer_cards.get(i), new Point(x_pos + i * 100, 100), Core.FONT_HERSHEY_PLAIN, 2, new Scalar(255, 0, 0), 3);
+            }
         }
+
+        if (cards.size() > 0) {
+            Mat transformed_cards = new Mat();
+            Core.hconcat(cards, transformed_cards);
+            final Bitmap bm = Bitmap.createBitmap(transformed_cards.cols(), transformed_cards.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(transformed_cards, bm);
+            Matrix matrix = new Matrix();
+            matrix.postRotate(90);
+            matrix.postScale(.25f, .25f);
+            final Bitmap resized_bm = Bitmap.createBitmap(bm, 0, 0, bm.getWidth(), bm.getHeight(), matrix, true);
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        imView.setImageBitmap(resized_bm);
+                    } catch (Exception e) {
+                        Log.e(TAG, e.getMessage());
+                    }
+
+                }
+            });
+        }
+
         return mRgba;
 
+
     }
+
+
 
     public void detectCards(Mat mRgba, List<Mat> cards, List<Point> centers) {
         // for testing, load in a static image
@@ -230,7 +307,7 @@ public class BlackjackActivity extends Activity implements CameraBridgeViewBase.
         Mat blur = new Mat();
         Mat th = new Mat();
         Imgproc.GaussianBlur(gray,blur,new Size(11,11),5);
-        Imgproc.threshold(blur, th, 150, 255, Imgproc.THRESH_BINARY);
+        Imgproc.threshold(blur, th, imThresh, 255, Imgproc.THRESH_BINARY);
         List<MatOfPoint> contours = new ArrayList<>();
 
         // Find the contours
@@ -329,6 +406,43 @@ public class BlackjackActivity extends Activity implements CameraBridgeViewBase.
         return;
     }
 
+    private class IdentifyCardsAsync extends AsyncTask<String,Integer, String> {
+        private List<Mat>  cards;
+        private List<Point> centers;
+        private List<String> player_cards;
+        private List<Card> player_values;
+        private List<String> dealer_cards;
+        private List<Card> dealer_values;
+
+        public IdentifyCardsAsync(List<Mat> cards,List<Point> centers, List<String> player_cards,
+                  List<Card> player_values, List<String> dealer_cards, List<Card> dealer_values) {
+            this.cards = cards;
+            this.centers = centers;
+            this.player_cards = player_cards;
+            this.player_values = player_values;
+            this.dealer_cards = dealer_cards;
+            this.dealer_values = dealer_values;
+        }
+
+        public IdentifyCardsAsync(){}
+
+        public void setData(List<Mat> cards,List<Point> centers, List<String> player_cards,
+                      List<Card> player_values, List<String> dealer_cards, List<Card> dealer_values) {
+            this.cards = cards;
+            this.centers = centers;
+            this.player_cards = player_cards;
+            this.player_values = player_values;
+            this.dealer_cards = dealer_cards;
+            this.dealer_values = dealer_values;
+        }
+
+        @Override
+        protected String doInBackground(String... params) {
+            identifyCards(cards, centers, player_cards, player_values, dealer_cards, dealer_values);
+            return null;
+        }
+    }
+
     public void identifyCards(List<Mat> cards, List<Point> centers, List<String> player_cards,
               List<Card>player_values,List<String> dealer_cards, List<Card> dealer_values) {
 
@@ -369,6 +483,12 @@ public class BlackjackActivity extends Activity implements CameraBridgeViewBase.
                 player_values.add(Card.valueOf(getCardIDString(idx)));
             }
         }
+
+        this.player_cards = player_cards;
+        this.player_values = player_values;
+        this.dealer_cards = dealer_cards;
+        this.dealer_values = dealer_values;
+        return;
     }
 
     public String getCardIDString(int id) {
@@ -439,37 +559,6 @@ public class BlackjackActivity extends Activity implements CameraBridgeViewBase.
             out.put(i,1,y);
         }
         return out;
-    }
-
-    public void playBlackjack() {
-
-        for (int i = 1; i < 53; i++) {
-
-            String path = String.format("template/%02d.bmp", i);
-            Mat im = new Mat();
-
-            try {
-                InputStream is = getAssets().open(path);
-                Bitmap bm = BitmapFactory.decodeStream(is);
-                int width = bm.getWidth();
-                int height = bm.getHeight();
-
-                Utils.bitmapToMat(bm, im);
-            } catch (java.io.IOException e) {
-                System.out.println("Error reading image file");
-            }
-
-            Mat gray = new Mat();
-            Mat blur = new Mat();
-            Imgproc.cvtColor(im, gray, Imgproc.COLOR_BGR2GRAY);
-            Imgproc.GaussianBlur(gray, blur, new Size(9, 9), 3);
-            Imgproc.threshold(blur, blur, 120, 255, Imgproc.THRESH_BINARY);
-
-            List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
-            Mat hierarchy = new Mat();
-            Imgproc.findContours(blur, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_NONE);
-
-        }
     }
 
     public void onDestroy() {
