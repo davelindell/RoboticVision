@@ -1,0 +1,20 @@
+﻿Build started 4/13/2016 9:16:56 PM.
+     1>Project "c:\Users\davel\documents\visual studio 2013\Projects\EE631_visual_odometry\EE631_visual_odometry\EE631_visual_odometry.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /I"C:\Program Files (x86)\opencv\build\install\include" /Zi /nologo /W3 /WX- /sdl /O2 /Oi /Oy- /GL /D _MBCS /Gm- /EHsc /MD /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Release\\" /Fd"Release\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt visual_odometry.cpp
+         visual_odometry.cpp
+     1>visual_odometry.cpp(30): warning C4244: 'argument' : conversion from 'double' to 'int', possible loss of data
+     1>visual_odometry.cpp(52): warning C4018: '<' : signed/unsigned mismatch
+     1>visual_odometry.cpp(70): warning C4018: '<' : signed/unsigned mismatch
+     1>visual_odometry.cpp(92): warning C4305: 'initializing' : truncation from 'double' to 'float'
+     1>visual_odometry.cpp(106): warning C4018: '<' : signed/unsigned mismatch
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"c:\users\davel\documents\visual studio 2013\Projects\EE631_visual_odometry\Release\EE631_visual_odometry.exe" /NOLOGO /LIBPATH:"C:\Program Files (x86)\opencv\build\install\x86\vc12\lib" opencv_world310.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"c:\users\davel\documents\visual studio 2013\Projects\EE631_visual_odometry\Release\EE631_visual_odometry.pdb" /OPT:REF /OPT:ICF /LTCG /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"c:\users\davel\documents\visual studio 2013\Projects\EE631_visual_odometry\Release\EE631_visual_odometry.lib" /MACHINE:X86 /SAFESEH Release\visual_odometry.obj
+         Generating code
+         Finished generating code
+         EE631_visual_odometry.vcxproj -> c:\users\davel\documents\visual studio 2013\Projects\EE631_visual_odometry\Release\EE631_visual_odometry.exe
+     1>Done Building Project "c:\Users\davel\documents\visual studio 2013\Projects\EE631_visual_odometry\EE631_visual_odometry\EE631_visual_odometry.vcxproj" (Build target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:00:01.93
