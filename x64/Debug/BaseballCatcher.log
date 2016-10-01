@@ -1,0 +1,20 @@
+﻿Build started 2/22/2016 3:42:41 PM.
+     1>Project "c:\Users\Jordan\documents\visual studio 2013\Projects\BaseballCatcher\BaseballCatcher.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\x86_amd64\CL.exe /c /I"C:\Program Files\OpenCV 3.0\build\include" /I"C:\Program Files\Point Grey Research\FlyCapture2\include" /Zi /nologo /W3 /WX- /sdl /Od /D WIN32 /D _WINDOWS /D _DEBUG /D _UNICODE /D UNICODE /D _AFXDLL /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Yu"stdafx.h" /Fp"x64\Debug\BaseballCatcher.pch" /Fo"x64\Debug\\" /Fd"x64\Debug\vc120.pdb" /Gd /TP /errorReport:prompt HardWare.cpp
+         HardWare.cpp
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\x86_amd64\link.exe /ERRORREPORT:PROMPT /OUT:"c:\users\jordan\documents\visual studio 2013\Projects\BaseballCatcher\x64\Debug\BaseballCatcher.exe" /INCREMENTAL /NOLOGO /LIBPATH:"C:\Program Files\OpenCV 3.0\build\x64\vc12\lib" opencv_world300d.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /manifestinput:"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\Include\Manifest\dpiaware.manifest" /DEBUG /PDB:"c:\users\jordan\documents\visual studio 2013\Projects\BaseballCatcher\x64\Debug\BaseballCatcher.pdb" /SUBSYSTEM:WINDOWS /TLBID:1 /ENTRY:"wWinMainCRTStartup" /DYNAMICBASE /NXCOMPAT /IMPLIB:"c:\users\jordan\documents\visual studio 2013\Projects\BaseballCatcher\x64\Debug\BaseballCatcher.lib" /MACHINE:X64 x64\Debug\BaseballCatcher.res
+         x64\Debug\BaseballCatcher.obj
+         x64\Debug\BaseballCatcherDlg.obj
+         x64\Debug\HardWare.obj
+         x64\Debug\RoboteqDevice.obj
+         x64\Debug\RoboteqWrapper.obj
+         x64\Debug\stdafx.obj
+         x64\Debug\wincomm.obj
+         BaseballCatcher.vcxproj -> c:\users\jordan\documents\visual studio 2013\Projects\BaseballCatcher\x64\Debug\BaseballCatcher.exe
+     1>Done Building Project "c:\Users\Jordan\documents\visual studio 2013\Projects\BaseballCatcher\BaseballCatcher.vcxproj" (Build target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:00:02.31
