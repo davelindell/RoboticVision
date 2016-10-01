@@ -5,6 +5,7 @@ packages
 x64
 *.tlog
 *.png
+
 # Folder config file
 Desktop.ini
 

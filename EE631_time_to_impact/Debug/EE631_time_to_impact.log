@@ -1,0 +1,20 @@
+﻿Build started 3/28/2016 8:22:43 PM.
+     1>Project "C:\Users\davel\documents\visual studio 2013\Projects\EE631_time_to_impact\EE631_time_to_impact\EE631_time_to_impact.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /I"C:\Program Files (x86)\opencv\prebuild\include" /ZI /nologo /W3 /WX- /sdl /Od /Oy- /D _MBCS /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Debug\\" /Fd"Debug\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt time_to_impact.cpp
+         time_to_impact.cpp
+     1>c:\users\davel\documents\visual studio 2013\projects\ee631_time_to_impact\ee631_time_to_impact\time_to_impact.cpp(31): warning C4244: 'argument' : conversion from 'double' to 'int', possible loss of data
+     1>c:\users\davel\documents\visual studio 2013\projects\ee631_time_to_impact\ee631_time_to_impact\time_to_impact.cpp(53): warning C4018: '<' : signed/unsigned mismatch
+     1>c:\users\davel\documents\visual studio 2013\projects\ee631_time_to_impact\ee631_time_to_impact\time_to_impact.cpp(66): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
+     1>c:\users\davel\documents\visual studio 2013\projects\ee631_time_to_impact\ee631_time_to_impact\time_to_impact.cpp(67): warning C4244: '=' : conversion from 'int' to 'float', possible loss of data
+     1>c:\users\davel\documents\visual studio 2013\projects\ee631_time_to_impact\ee631_time_to_impact\time_to_impact.cpp(140): warning C4244: 'argument' : conversion from 'int' to 'float', possible loss of data
+     1>c:\users\davel\documents\visual studio 2013\projects\ee631_time_to_impact\ee631_time_to_impact\time_to_impact.cpp(143): warning C4018: '<' : signed/unsigned mismatch
+     1>c:\users\davel\documents\visual studio 2013\projects\ee631_time_to_impact\ee631_time_to_impact\time_to_impact.cpp(149): warning C4018: '<' : signed/unsigned mismatch
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\Users\davel\documents\visual studio 2013\Projects\EE631_time_to_impact\Debug\EE631_time_to_impact.exe" /INCREMENTAL /NOLOGO /LIBPATH:"C:\Program Files (x86)\opencv\build\lib\Debug" opencv_world310d.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:\Users\davel\documents\visual studio 2013\Projects\EE631_time_to_impact\Debug\EE631_time_to_impact.pdb" /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:\Users\davel\documents\visual studio 2013\Projects\EE631_time_to_impact\Debug\EE631_time_to_impact.lib" /MACHINE:X86 Debug\time_to_impact.obj
+         EE631_time_to_impact.vcxproj -> C:\Users\davel\documents\visual studio 2013\Projects\EE631_time_to_impact\Debug\EE631_time_to_impact.exe
+     1>Done Building Project "C:\Users\davel\documents\visual studio 2013\Projects\EE631_time_to_impact\EE631_time_to_impact\EE631_time_to_impact.vcxproj" (Build target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:00:01.00
