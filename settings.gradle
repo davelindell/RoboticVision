@@ -1,0 +1,3 @@
+include ':app'
+include ':app/src/main/assets'
+include ':openCVLibrary310'
